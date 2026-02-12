@@ -168,7 +168,7 @@ The application handles VPN/database connectivity issues gracefully:
 
 ## Architecture
 
-For complete architectural documentation, implementation details, and SQL queries, see [`claude.md`](claude.md).
+For complete architectural documentation, implementation details, and SQL queries, see [`claude.md [not_included]`](claude.md).
 
 ## License
 
