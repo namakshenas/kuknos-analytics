@@ -47,7 +47,7 @@ export default function Refunds() {
       } catch (err) {
         console.error('Error fetching refunds data:', err);
         if (err.response?.status === 503) {
-          setError('خطا در اتصال به پایگاه داده. لطفاً اتصال VPN را بررسی کنید.');
+          setError('خطا در اتصال به پایگاه داده');
         } else {
           setError('خطا در دریافت اطلاعات');
         }

@@ -3,7 +3,6 @@
 ## Prerequisites ✓
 - [x] Python 3.11+
 - [x] Node.js 18+
-- [x] The app should work without VPN
 - [x] uv installed (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 
 ## Installation (First Time Only)
@@ -53,7 +52,7 @@ Click the sidebar items (on the right side):
 
 ### Error: Database connection failed
 
-**Solution:** Check your connection (The app should work without VPN)
+**Solution:** Check your connection
 
 ### Error: npm permission issues
 

@@ -11,7 +11,6 @@ Persian/RTL analytics dashboard for PMN token transactions. A read-only analytic
   - Refund Analytics (7 endpoints)
   - User Analytics (7 endpoints)
 - **Rich Visualizations**: KPI cards, line charts, pie charts, bar charts using Apache ECharts
-- **VPN-aware Error Handling**: The app should work without VPN
 
 ## Tech Stack
 
@@ -34,7 +33,7 @@ Persian/RTL analytics dashboard for PMN token transactions. A read-only analytic
 ### Prerequisites
 - Python 3.11+
 - Node.js 18+
-- PostgreSQL database access (The app should work without VPN)
+- PostgreSQL database access
 - uv installed (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 
 ### Installation
@@ -162,7 +161,6 @@ npm install <package-name>
 ## Error Handling
 
 The application handles connectivity issues gracefully:
-- The app should work without VPN
 - Backend returns 503 with `DB_UNREACHABLE` code
 - Frontend displays Persian error message with retry button
 - All database operations are wrapped in try/except blocks

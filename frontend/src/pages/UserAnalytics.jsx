@@ -45,9 +45,9 @@ export default function UserAnalytics() {
         setMonthlyActive(activeRes.data.series);
         setBuySellComparison(comparisonRes.data.series);
       } catch (err) {
-        console.error('Error fetching user analytics data:', err);
+        console.error('Error fetching user analytics:', err);
         if (err.response?.status === 503) {
-          setError('خطا در اتصال به پایگاه داده. لطفاً اتصال VPN را بررسی کنید.');
+          setError('خطا در اتصال به پایگاه داده');
         } else {
           setError('خطا در دریافت اطلاعات');
         }

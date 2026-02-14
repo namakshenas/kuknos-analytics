@@ -69,7 +69,7 @@ async def get_kpis(session: AsyncSession) -> Dict:
         logger.error(f"Database error in refunds_service.get_kpis: {e}")
         raise HTTPException(
             status_code=503,
-            detail="خطا در اتصال به پایگاه داده. لطفاً اتصال VPN را بررسی کنید."
+            detail="خطا در اتصال به پایگاه داده"
         )
 
 

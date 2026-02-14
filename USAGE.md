@@ -74,10 +74,10 @@ cd frontend && npm install
 
 **Symptoms:** 503 error, "DB_UNREACHABLE" message
 
-**Cause:** Database is unreachable (The app should work without VPN)
+**Cause:** Database is unreachable
 
 **Solutions:**
-1. Check connection (The app should work without VPN)
+1. Check connection
 2. Verify database credentials in `.env`
 3. Test connection manually:
    ```bash
