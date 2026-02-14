@@ -7,10 +7,9 @@ import jalaali from 'jalaali-js';
 function getCurrentJalaliMonth() {
   const now = new Date();
   const j = jalaali.toJalaali(now.getFullYear(), now.getMonth() + 1, now.getDate());
-  const lastDay = j.jm <= 6 ? 31 : j.jm <= 11 ? 30 : 29;
   return {
-    start: new DateObject({ year: j.jy, month: j.jm, day: 1, calendar: persian, locale: persian_fa }),
-    end: new DateObject({ year: j.jy, month: j.jm, day: lastDay, calendar: persian, locale: persian_fa }),
+    start: new DateObject({ year: 1404, month: 10, day: 1, calendar: persian, locale: persian_fa }),
+    end: new DateObject({ year: j.jy, month: j.jm, day: j.jd, calendar: persian, locale: persian_fa }),
   };
 }
 

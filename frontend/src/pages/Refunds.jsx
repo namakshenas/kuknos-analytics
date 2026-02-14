@@ -89,7 +89,7 @@ export default function Refunds() {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {loading
-          ? Array(7)
+          ? Array(8)
               .fill(0)
               .map((_, i) => (
                 <div key={i} className="bg-white p-6 rounded-xl shadow-sm animate-pulse">

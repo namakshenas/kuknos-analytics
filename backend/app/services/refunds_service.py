@@ -21,6 +21,11 @@ async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_
         total_pending = result.scalar() or 0
 
         result = await session.execute(
+            text(f"SELECT COALESCE(SUM(total_price), 0) AS total FROM pending_refunds WHERE status = '1' AND code = 'PMN'{df}"), params
+        )
+        pending_amount = result.scalar() or 0
+
+        result = await session.execute(
             text(f"SELECT COALESCE(SUM(amount), 0) AS total FROM pending_refunds WHERE status = '0' AND code = 'PMN'{df}"), params
         )
         total_sold = result.scalar() or 0
@@ -49,6 +54,7 @@ async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_
             "kpis": [
                 {"key": "total_completed", "label": "تعداد بازپرداخت‌های تکمیل شده", "value": int(total_completed), "format": "number"},
                 {"key": "total_pending", "label": "تعداد بازپرداخت‌های در انتظار", "value": int(total_pending), "format": "number"},
+                {"key": "pending_amount", "label": "مجموع بازپرداخت‌های در انتظار", "value": int(pending_amount), "format": "rial"},
                 {"key": "total_sold", "label": "حجم کل PMN فروخته شده", "value": float(total_sold), "format": "number"},
                 {"key": "total_payout", "label": "مجموع پرداختی (ریال)", "value": int(total_payout), "format": "rial"},
                 {"key": "total_fees", "label": "مجموع کارمزد", "value": int(total_fees), "format": "rial"},
