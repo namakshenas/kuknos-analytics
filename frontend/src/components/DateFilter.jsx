@@ -41,7 +41,8 @@ export default function DateFilter({ onApply }) {
   };
 
   return (
-    <div className="flex items-center gap-3 mb-6 flex-wrap">
+    <>
+    <div className="flex items-center gap-3 mb-4 flex-wrap">
       <label className="text-sm text-gray-600">از:</label>
       <DatePicker
         value={startDate}
@@ -67,5 +68,7 @@ export default function DateFilter({ onApply }) {
         اعمال
       </button>
     </div>
+    <hr className="border-gray-200 mb-6" />
+  </>
   );
 }
