@@ -3,7 +3,7 @@ import client from '../api/client';
 import KPICard from '../components/KPICard';
 import ChartCard from '../components/ChartCard';
 import { chartColors } from '../utils/chartDefaults';
-import { toJalaliShort, toJalaliMonth } from '../utils/formatters';
+import { toJalali, toJalaliShort, toJalaliMonth } from '../utils/formatters';
 
 /**
  * Refunds analytics page
@@ -100,7 +100,7 @@ export default function Refunds() {
           option={{
             xAxis: {
               type: 'category',
-              data: dailyCount.map((d) => toJalaliShort(d.date)),
+              data: dailyCount.map((d) => toJalali(d.date)),
             },
             yAxis: { type: 'value' },
             series: [
@@ -199,7 +199,7 @@ export default function Refunds() {
           option={{
             xAxis: {
               type: 'category',
-              data: rateTrend.map((d) => toJalaliShort(d.date)),
+              data: rateTrend.map((d) => toJalali(d.date)),
             },
             yAxis: { type: 'value' },
             series: [

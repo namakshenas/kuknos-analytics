@@ -3,7 +3,7 @@ import client from '../api/client';
 import KPICard from '../components/KPICard';
 import ChartCard from '../components/ChartCard';
 import { chartColors } from '../utils/chartDefaults';
-import { toJalaliShort, toJalaliMonth } from '../utils/formatters';
+import { toJalali, toJalaliShort, toJalaliMonth } from '../utils/formatters';
 
 /**
  * Buys / Payments analytics page
@@ -111,7 +111,7 @@ export default function Buys() {
           option={{
             xAxis: {
               type: 'category',
-              data: dailyCount.map((d) => toJalaliShort(d.date)),
+              data: dailyCount.map((d) => toJalali(d.date)),
             },
             yAxis: { type: 'value' },
             series: [
@@ -133,7 +133,7 @@ export default function Buys() {
           option={{
             xAxis: {
               type: 'category',
-              data: dailyVolume.map((d) => toJalaliShort(d.date)),
+              data: dailyVolume.map((d) => toJalali(d.date)),
             },
             yAxis: { type: 'value' },
             series: [

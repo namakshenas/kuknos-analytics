@@ -3,7 +3,7 @@ import client from '../api/client';
 import KPICard from '../components/KPICard';
 import ChartCard from '../components/ChartCard';
 import { chartColors } from '../utils/chartDefaults';
-import { toJalaliMonth } from '../utils/formatters';
+import { toJalali, toJalaliMonth } from '../utils/formatters';
 
 /**
  * User Analytics page
