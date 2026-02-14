@@ -2,36 +2,35 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 from app.logger import logger
-from typing import Dict
+from typing import Dict, Optional
+from app.services.date_utils import build_date_filter
 
 
-async def get_kpis(session: AsyncSession) -> Dict:
-    """
-    Get user analytics KPI cards.
-    Queries: 28-29 from claude.md
-    """
+async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
     try:
-        # Query 28: Total unique users (union of buyers + sellers)
+        df, params = build_date_filter(start_date, end_date)
+
         result = await session.execute(
-            text("""
+            text(f"""
                 SELECT COUNT(DISTINCT wallet) AS total_users FROM (
-                    SELECT public_key AS wallet FROM pending_txes WHERE code = 'PMN' AND status = '0'
+                    SELECT public_key AS wallet FROM pending_txes WHERE code = 'PMN' AND status = '0'{df}
                     UNION
-                    SELECT public AS wallet FROM pending_refunds WHERE code = 'PMN' AND status = '0'
+                    SELECT public AS wallet FROM pending_refunds WHERE code = 'PMN' AND status = '0'{df}
                 ) AS all_users
-            """)
+            """),
+            params,
         )
         total_users = result.scalar() or 0
 
-        # Query 29: Users who both bought and sold PMN
         result = await session.execute(
-            text("""
+            text(f"""
                 SELECT COUNT(*) AS both_side_users FROM (
-                    SELECT public_key AS wallet FROM pending_txes WHERE code = 'PMN' AND status = '0'
+                    SELECT public_key AS wallet FROM pending_txes WHERE code = 'PMN' AND status = '0'{df}
                     INTERSECT
-                    SELECT public AS wallet FROM pending_refunds WHERE code = 'PMN' AND status = '0'
+                    SELECT public AS wallet FROM pending_refunds WHERE code = 'PMN' AND status = '0'{df}
                 ) AS combined_users
-            """)
+            """),
+            params,
         )
         both_side = result.scalar() or 0
 
@@ -44,17 +43,15 @@ async def get_kpis(session: AsyncSession) -> Dict:
 
     except Exception as e:
         logger.error(f"Database error in users_service.get_kpis: {e}")
-        raise HTTPException(
-            status_code=503,
-            detail="خطا در اتصال به پایگاه داده"
-        )
+        raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_new_per_month(session: AsyncSession) -> Dict:
-    """Query 30: New users per month (first purchase date)"""
+async def get_new_per_month(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
     try:
+        df, params = build_date_filter(start_date, end_date)
+
         result = await session.execute(
-            text("""
+            text(f"""
                 SELECT DATE_TRUNC('month', first_buy) AS month, COUNT(*) AS new_users
                 FROM (
                     SELECT public_key, MIN(created_at) AS first_buy
@@ -62,17 +59,16 @@ async def get_new_per_month(session: AsyncSession) -> Dict:
                     WHERE status = '0' AND code = 'PMN'
                     GROUP BY public_key
                 ) AS first_purchases
+                WHERE 1=1{df.replace('created_at', 'first_buy')}
                 GROUP BY DATE_TRUNC('month', first_buy)
                 ORDER BY month
-            """)
+            """),
+            params,
         )
         rows = result.fetchall()
 
         return {
-            "series": [
-                {"date": str(row.month.date()), "value": int(row.new_users)}
-                for row in rows
-            ]
+            "series": [{"date": str(row.month.date()), "value": int(row.new_users)} for row in rows]
         }
 
     except Exception as e:
@@ -80,18 +76,20 @@ async def get_new_per_month(session: AsyncSession) -> Dict:
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_top_buyers(session: AsyncSession) -> Dict:
-    """Query 31: Top 10 buyers by volume"""
+async def get_top_buyers(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
     try:
+        df, params = build_date_filter(start_date, end_date)
+
         result = await session.execute(
-            text("""
+            text(f"""
                 SELECT public_key, SUM(amount) AS total_amount, COUNT(*) AS tx_count
                 FROM pending_txes
-                WHERE status = '0' AND code = 'PMN'
+                WHERE status = '0' AND code = 'PMN'{df}
                 GROUP BY public_key
                 ORDER BY total_amount DESC
                 LIMIT 10
-            """)
+            """),
+            params,
         )
         rows = result.fetchall()
 
@@ -107,18 +105,20 @@ async def get_top_buyers(session: AsyncSession) -> Dict:
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_top_sellers(session: AsyncSession) -> Dict:
-    """Query 32: Top 10 sellers by volume"""
+async def get_top_sellers(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
     try:
+        df, params = build_date_filter(start_date, end_date)
+
         result = await session.execute(
-            text("""
+            text(f"""
                 SELECT public, SUM(amount) AS total_amount, COUNT(*) AS tx_count
                 FROM pending_refunds
-                WHERE status = '0' AND code = 'PMN'
+                WHERE status = '0' AND code = 'PMN'{df}
                 GROUP BY public
                 ORDER BY total_amount DESC
                 LIMIT 10
-            """)
+            """),
+            params,
         )
         rows = result.fetchall()
 
@@ -134,11 +134,12 @@ async def get_top_sellers(session: AsyncSession) -> Dict:
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_activity_distribution(session: AsyncSession) -> Dict:
-    """Query 33: User activity distribution (transaction count histogram)"""
+async def get_activity_distribution(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
     try:
+        df, params = build_date_filter(start_date, end_date)
+
         result = await session.execute(
-            text("""
+            text(f"""
                 SELECT
                     CASE
                         WHEN tx_count = 1 THEN '۱'
@@ -151,20 +152,18 @@ async def get_activity_distribution(session: AsyncSession) -> Dict:
                 FROM (
                     SELECT public_key, COUNT(*) AS tx_count
                     FROM pending_txes
-                    WHERE status = '0' AND code = 'PMN'
+                    WHERE status = '0' AND code = 'PMN'{df}
                     GROUP BY public_key
                 ) AS user_activity
                 GROUP BY activity_bucket
                 ORDER BY MIN(tx_count)
-            """)
+            """),
+            params,
         )
         rows = result.fetchall()
 
         return {
-            "data": [
-                {"name": row.activity_bucket, "value": int(row.user_count)}
-                for row in rows
-            ]
+            "data": [{"name": row.activity_bucket, "value": int(row.user_count)} for row in rows]
         }
 
     except Exception as e:
@@ -172,25 +171,24 @@ async def get_activity_distribution(session: AsyncSession) -> Dict:
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_monthly_active(session: AsyncSession) -> Dict:
-    """Query 34: Monthly active users"""
+async def get_monthly_active(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
     try:
+        df, params = build_date_filter(start_date, end_date)
+
         result = await session.execute(
-            text("""
+            text(f"""
                 SELECT DATE_TRUNC('month', created_at) AS month, COUNT(DISTINCT public_key) AS active_users
                 FROM pending_txes
-                WHERE status = '0' AND code = 'PMN'
+                WHERE status = '0' AND code = 'PMN'{df}
                 GROUP BY DATE_TRUNC('month', created_at)
                 ORDER BY month
-            """)
+            """),
+            params,
         )
         rows = result.fetchall()
 
         return {
-            "series": [
-                {"date": str(row.month.date()), "value": int(row.active_users)}
-                for row in rows
-            ]
+            "series": [{"date": str(row.month.date()), "value": int(row.active_users)} for row in rows]
         }
 
     except Exception as e:
@@ -198,27 +196,29 @@ async def get_monthly_active(session: AsyncSession) -> Dict:
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_buy_sell_comparison(session: AsyncSession) -> Dict:
-    """Query 35: Buy vs. Sell volume comparison per month"""
+async def get_buy_sell_comparison(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
     try:
+        df, params = build_date_filter(start_date, end_date)
+
         result = await session.execute(
-            text("""
+            text(f"""
                 SELECT
                     COALESCE(b.month, s.month) AS month,
                     COALESCE(b.buy_amount, 0) AS buy_amount,
                     COALESCE(s.sell_amount, 0) AS sell_amount
                 FROM (
                     SELECT DATE_TRUNC('month', created_at) AS month, SUM(amount) AS buy_amount
-                    FROM pending_txes WHERE status = '0' AND code = 'PMN'
+                    FROM pending_txes WHERE status = '0' AND code = 'PMN'{df}
                     GROUP BY month
                 ) b
                 FULL OUTER JOIN (
                     SELECT DATE_TRUNC('month', created_at) AS month, SUM(amount) AS sell_amount
-                    FROM pending_refunds WHERE status = '0' AND code = 'PMN'
+                    FROM pending_refunds WHERE status = '0' AND code = 'PMN'{df}
                     GROUP BY month
                 ) s ON b.month = s.month
                 ORDER BY month
-            """)
+            """),
+            params,
         )
         rows = result.fetchall()
 
