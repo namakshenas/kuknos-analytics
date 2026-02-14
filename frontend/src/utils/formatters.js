@@ -31,7 +31,7 @@ export function formatRial(amount) {
  */
 export function formatPercent(value) {
   if (value === null || value === undefined) return toPersianDigits('۰٪');
-  return `${toPersianDigits(Number(value).toFixed(2))}٪`;
+  return `${toPersianDigits(Number(value).toFixed(2).replace('.', '٫'))}٪`;
 }
 
 /**
@@ -39,7 +39,7 @@ export function formatPercent(value) {
  */
 export function formatDecimal(value) {
   if (value === null || value === undefined) return toPersianDigits('۰');
-  return toPersianDigits(Number(value).toFixed(2));
+  return toPersianDigits(Number(value).toFixed(2).replace('.', '٫'));
 }
 
 /**
