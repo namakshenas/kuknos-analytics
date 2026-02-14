@@ -26,8 +26,8 @@ export const persianChartDefaults = {
     }
   },
   grid: {
-    left: '3%',
-    right: '4%',
+    left: '8%',
+    right: '5%',
     bottom: '20%',  // Extra space for rotated X-axis labels
     containLabel: true
   },
@@ -48,6 +48,7 @@ export const persianChartDefaults = {
     axisLabel: {
       fontFamily: 'Vazirmatn, sans-serif',
       fontSize: 11,
+      margin: 20,  // Move labels further left to avoid overlap
       formatter: (value) => {
         // Format Y-axis numbers in Persian
         if (value >= 1000000) {
