@@ -164,6 +164,46 @@ async def get_rate_trend(session: AsyncSession, start_date: Optional[str] = None
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
+async def get_rate_candlestick(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+    try:
+        df, params = build_date_filter(start_date, end_date)
+        time_filter = df if df else " AND created_at >= NOW() - INTERVAL '12 months'"
+
+        result = await session.execute(
+            text(f"""
+                SELECT
+                    DATE(created_at) AS day,
+                    (ARRAY_AGG(refund_rate ORDER BY created_at ASC))[1] AS open,
+                    (ARRAY_AGG(refund_rate ORDER BY created_at DESC))[1] AS close,
+                    MIN(refund_rate) AS low,
+                    MAX(refund_rate) AS high
+                FROM pending_refunds
+                WHERE status IN ('0', '1') AND code = 'PMN' AND refund_rate > 0{time_filter}
+                GROUP BY DATE(created_at)
+                ORDER BY day
+            """),
+            params,
+        )
+        rows = result.fetchall()
+
+        return {
+            "series": [
+                {
+                    "date": str(row.day),
+                    "open": float(row.open),
+                    "close": float(row.close),
+                    "low": float(row.low),
+                    "high": float(row.high),
+                }
+                for row in rows
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Database error in refunds_service.get_rate_candlestick: {e}")
+        raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
+
+
 async def get_status_distribution(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)

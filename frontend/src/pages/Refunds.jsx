@@ -4,7 +4,7 @@ import KPICard from '../components/KPICard';
 import ChartCard from '../components/ChartCard';
 import DateFilter, { getDefaultDateRange } from '../components/DateFilter';
 import { chartColors } from '../utils/chartDefaults';
-import { toJalali, toJalaliShort, toJalaliMonth } from '../utils/formatters';
+import { toJalali, toJalaliShort, toJalaliMonth, formatNumber } from '../utils/formatters';
 
 export default function Refunds() {
   const defaults = getDefaultDateRange();
@@ -15,6 +15,7 @@ export default function Refunds() {
   const [dailyCount, setDailyCount] = useState([]);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [rateTrend, setRateTrend] = useState([]);
+  const [rateCandlestick, setRateCandlestick] = useState([]);
   const [statusDist, setStatusDist] = useState([]);
   const [byBank, setByBank] = useState([]);
   const [amountDist, setAmountDist] = useState([]);
@@ -28,12 +29,13 @@ export default function Refunds() {
       setError(null);
       const params = { start_date: startDate, end_date: endDate };
 
-      const [kpisRes, dailyRes, monthlyRes, rateRes, statusRes, bankRes, amountRes] =
+      const [kpisRes, dailyRes, monthlyRes, rateRes, rateCandleRes, statusRes, bankRes, amountRes] =
         await Promise.all([
           client.get('/refunds/kpis', { params }),
           client.get('/refunds/daily-count', { params }),
           client.get('/refunds/monthly-trend', { params }),
           client.get('/refunds/rate-trend', { params }),
+          client.get('/refunds/rate-candlestick', { params }),
           client.get('/refunds/status-distribution', { params }),
           client.get('/refunds/by-bank', { params }),
           client.get('/refunds/amount-distribution', { params }),
@@ -43,6 +45,7 @@ export default function Refunds() {
       setDailyCount(dailyRes.data.series);
       setMonthlyTrend(monthlyRes.data.series);
       setRateTrend(rateRes.data.series);
+      setRateCandlestick(rateCandleRes.data.series);
       setStatusDist(statusRes.data.data);
       setByBank(bankRes.data.data);
       setAmountDist(amountRes.data.data);
@@ -102,6 +105,42 @@ export default function Refunds() {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ChartCard
+          title="نرخ بازپرداخت روزانه"
+          loading={loading}
+          option={{
+            grid: { left: '2%', right: '5%', containLabel: true },
+            xAxis: { type: 'category', data: rateCandlestick.map((d) => toJalali(d.date)), axisLabel: { rotate: 45 } },
+            yAxis: { type: 'value', scale: true, axisLabel: { margin: 8, formatter: (val) => val.toLocaleString('fa-IR') } },
+            tooltip: {
+              trigger: 'axis',
+              axisPointer: { type: 'cross', label: { show: false } },
+              formatter: (params) => {
+                const p = Array.isArray(params) ? params[0] : params;
+                if (!p || !p.value) return '';
+                const [, open, close, low, high] = p.value;
+                return `${p.axisValue}<br/>
+                  باز: ${formatNumber(open)}<br/>
+                  بسته: ${formatNumber(close)}<br/>
+                  کمترین: ${formatNumber(low)}<br/>
+                  بیشترین: ${formatNumber(high)}`;
+              },
+            },
+            series: [
+              {
+                name: 'نرخ بازپرداخت',
+                type: 'candlestick',
+                data: rateCandlestick.map((d) => [d.open, d.close, d.low, d.high]),
+                itemStyle: {
+                  color: '#10b981',
+                  color0: '#ef4444',
+                  borderColor: '#10b981',
+                  borderColor0: '#ef4444',
+                },
+              },
+            ],
+          }}
+        />
         <ChartCard
           title="تعداد بازپرداخت‌ها در روز"
           loading={loading}

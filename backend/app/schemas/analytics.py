@@ -83,3 +83,19 @@ class BuySellComparisonResponse(BaseModel):
     """Response model for buy/sell comparison"""
 
     series: List[BuySellComparisonPoint]
+
+
+class CandlestickPoint(BaseModel):
+    """Single OHLC data point for candlestick chart"""
+
+    date: str
+    open: float
+    close: float
+    low: float
+    high: float
+
+
+class CandlestickResponse(BaseModel):
+    """Response model for candlestick chart endpoints"""
+
+    series: List[CandlestickPoint]

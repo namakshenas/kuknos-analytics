@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.database import get_session
 from app.services import refunds_service
-from app.schemas.analytics import KPIResponse, SeriesResponse, DistributionResponse
+from app.schemas.analytics import KPIResponse, SeriesResponse, DistributionResponse, CandlestickResponse
 
 router = APIRouter()
 
@@ -42,6 +42,15 @@ async def get_refund_rate_trend(
     session: AsyncSession = Depends(get_session),
 ):
     return await refunds_service.get_rate_trend(session, start_date, end_date)
+
+
+@router.get("/rate-candlestick", response_model=CandlestickResponse)
+async def get_rate_candlestick(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    session: AsyncSession = Depends(get_session),
+):
+    return await refunds_service.get_rate_candlestick(session, start_date, end_date)
 
 
 @router.get("/status-distribution", response_model=DistributionResponse)
