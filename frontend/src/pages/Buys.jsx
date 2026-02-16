@@ -44,6 +44,18 @@ export default function Buys() {
       ]);
 
       setKpis(kpisRes.data.kpis);
+
+      // Lazy-load expensive fee KPI separately
+      client.get('/buys/total-fee', { params }).then((feeRes) => {
+        setKpis((prev) =>
+          prev.map((kpi) =>
+            kpi.key === 'total_buys_fee' ? { ...kpi, ...feeRes.data.kpi, lazy: false } : kpi
+          )
+        );
+      }).catch((err) => {
+        console.error('Error fetching buys fee:', err);
+      });
+
       setDailyCount(dailyCountRes.data.series);
       setDailyVolume(dailyVolumeRes.data.series);
       setMonthlyTrend(monthlyRes.data.series);

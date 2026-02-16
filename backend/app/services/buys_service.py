@@ -35,51 +35,6 @@ async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_
         )
         avg_amount = result.scalar() or 0
 
-        # Calculate total buys fee using ND prices from market_parameters_minutes
-        # Fee per token = floor(0.02 * ND), total fee per tx = amount * floor(0.02 * ND)
-        tx_result = await session.execute(
-            text(f"""
-                SELECT created_at, amount
-                FROM pending_txes
-                WHERE status = '0' AND code = 'PMN'{df}
-                ORDER BY created_at
-            """),
-            params,
-        )
-        tx_rows = tx_result.fetchall()
-
-        nd_result = await session.execute(
-            text("""
-                SELECT last_update, price
-                FROM market_parameters_minutes
-                WHERE name = 'ND'
-                ORDER BY last_update
-            """)
-        )
-        nd_rows = nd_result.fetchall()
-
-        total_buys_fee = 0
-        if tx_rows and nd_rows:
-            nd_timestamps = np.array([row.last_update.timestamp() for row in nd_rows])
-            nd_prices = np.array([float(row.price) for row in nd_rows])
-
-            tx_timestamps = np.array([row.created_at.timestamp() for row in tx_rows])
-            tx_amounts = np.array([float(row.amount) for row in tx_rows])
-
-            # Find closest ND index for each transaction
-            indices = np.searchsorted(nd_timestamps, tx_timestamps, side='right') - 1
-            indices = np.clip(indices, 0, len(nd_timestamps) - 1)
-
-            # For boundary cases, check if the next index is actually closer
-            next_indices = np.minimum(indices + 1, len(nd_timestamps) - 1)
-            diff_left = np.abs(tx_timestamps - nd_timestamps[indices])
-            diff_right = np.abs(tx_timestamps - nd_timestamps[next_indices])
-            closest_indices = np.where(diff_right < diff_left, next_indices, indices)
-
-            closest_nd_prices = nd_prices[closest_indices]
-            fee_per_token = np.floor(0.02 * closest_nd_prices)
-            total_buys_fee = int(np.sum(tx_amounts * fee_per_token))
-
         result = await session.execute(
             text(f"SELECT COUNT(DISTINCT public_key) AS unique_buyers FROM pending_txes WHERE status = '0' AND code = 'PMN'{df}"),
             params,
@@ -92,7 +47,7 @@ async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_
                 {"key": "total_volume", "label": "حجم کل PMN", "value": float(total_volume), "format": "number"},
                 {"key": "total_revenue", "label": "مجموع ریالی", "value": int(total_revenue), "format": "rial"},
                 {"key": "avg_amount", "label": "میانگین مقدار خرید", "value": float(avg_amount), "format": "decimal"},
-                {"key": "total_buys_fee", "label": "مجموع کارمزد", "value": int(total_buys_fee), "format": "rial"},
+                {"key": "total_buys_fee", "label": "مجموع کارمزد", "value": None, "format": "rial", "lazy": True},
                 {"key": "unique_buyers", "label": "تعداد خریداران منحصر به فرد", "value": int(unique_buyers), "format": "number"},
             ]
         }
@@ -326,4 +281,59 @@ async def get_amount_distribution(session: AsyncSession, start_date: Optional[st
 
     except Exception as e:
         logger.error(f"Database error in buys_service.get_amount_distribution: {e}")
+        raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
+
+
+async def get_total_buys_fee(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+    """Expensive KPI: calculates total buy fees using ND prices from market_parameters_minutes."""
+    try:
+        df, params = build_date_filter(start_date, end_date)
+
+        tx_result = await session.execute(
+            text(f"""
+                SELECT created_at, amount
+                FROM pending_txes
+                WHERE status = '0' AND code = 'PMN'{df}
+                ORDER BY created_at
+            """),
+            params,
+        )
+        tx_rows = tx_result.fetchall()
+
+        nd_result = await session.execute(
+            text("""
+                SELECT last_update, price
+                FROM market_parameters_minutes
+                WHERE name = 'ND'
+                ORDER BY last_update
+            """)
+        )
+        nd_rows = nd_result.fetchall()
+
+        total_buys_fee = 0
+        if tx_rows and nd_rows:
+            nd_timestamps = np.array([row.last_update.timestamp() for row in nd_rows])
+            nd_prices = np.array([float(row.price) for row in nd_rows])
+
+            tx_timestamps = np.array([row.created_at.timestamp() for row in tx_rows])
+            tx_amounts = np.array([float(row.amount) for row in tx_rows])
+
+            indices = np.searchsorted(nd_timestamps, tx_timestamps, side='right') - 1
+            indices = np.clip(indices, 0, len(nd_timestamps) - 1)
+
+            next_indices = np.minimum(indices + 1, len(nd_timestamps) - 1)
+            diff_left = np.abs(tx_timestamps - nd_timestamps[indices])
+            diff_right = np.abs(tx_timestamps - nd_timestamps[next_indices])
+            closest_indices = np.where(diff_right < diff_left, next_indices, indices)
+
+            closest_nd_prices = nd_prices[closest_indices]
+            fee_per_token = np.floor(0.02 * closest_nd_prices)
+            total_buys_fee = int(np.sum(tx_amounts * fee_per_token))
+
+        return {
+            "kpi": {"key": "total_buys_fee", "label": "مجموع کارمزد", "value": int(total_buys_fee), "format": "rial"}
+        }
+
+    except Exception as e:
+        logger.error(f"Database error in buys_service.get_total_buys_fee: {e}")
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")

@@ -8,8 +8,9 @@ class KPIItem(BaseModel):
 
     key: str
     label: str
-    value: float | int
+    value: Optional[float | int] = None
     format: Literal["number", "rial", "percent", "decimal"]
+    lazy: Optional[bool] = None
 
 
 class KPIResponse(BaseModel):

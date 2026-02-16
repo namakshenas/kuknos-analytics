@@ -17,6 +17,15 @@ async def get_buys_kpis(
     return await buys_service.get_kpis(session, start_date, end_date)
 
 
+@router.get("/total-fee")
+async def get_total_buys_fee(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    session: AsyncSession = Depends(get_session),
+):
+    return await buys_service.get_total_buys_fee(session, start_date, end_date)
+
+
 @router.get("/daily-count", response_model=SeriesResponse)
 async def get_daily_purchase_count(
     start_date: Optional[str] = Query(None),

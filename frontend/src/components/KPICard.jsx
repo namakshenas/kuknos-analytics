@@ -4,7 +4,7 @@ import { formatNumber, formatRial, formatPercent, formatDecimal } from '../utils
 /**
  * KPI Card component - displays a single metric with label and formatted value
  */
-export default function KPICard({ label, value, format, icon }) {
+export default function KPICard({ label, value, format, icon, lazy }) {
   const formatValue = () => {
     switch (format) {
       case 'rial':
@@ -24,7 +24,11 @@ export default function KPICard({ label, value, format, icon }) {
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm text-gray-600 mb-2">{label}</p>
-          <p className="text-2xl font-bold text-gray-900">{formatValue()}</p>
+          {lazy ? (
+            <div className="h-8 bg-gray-200 rounded w-1/2 animate-pulse"></div>
+          ) : (
+            <p className="text-2xl font-bold text-gray-900">{formatValue()}</p>
+          )}
         </div>
         {icon && (
           <div className="text-indigo-600 opacity-80">
