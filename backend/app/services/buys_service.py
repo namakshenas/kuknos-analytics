@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from app.logger import logger
 from typing import Dict, Optional
 from app.services.date_utils import build_date_filter
+import numpy as np
 
 
 async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
@@ -34,17 +35,50 @@ async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_
         )
         avg_amount = result.scalar() or 0
 
-        result = await session.execute(
+        # Calculate total buys fee using ND prices from market_parameters_minutes
+        # Fee per token = floor(0.02 * ND), total fee per tx = amount * floor(0.02 * ND)
+        tx_result = await session.execute(
             text(f"""
-                SELECT ROUND(
-                    COUNT(*) FILTER (WHERE status = '0') * 100.0 / NULLIF(COUNT(*), 0), 2
-                ) AS success_rate
+                SELECT created_at, amount
                 FROM pending_txes
-                WHERE code = 'PMN'{df}
+                WHERE status = '0' AND code = 'PMN'{df}
+                ORDER BY created_at
             """),
             params,
         )
-        success_rate = result.scalar() or 0
+        tx_rows = tx_result.fetchall()
+
+        nd_result = await session.execute(
+            text("""
+                SELECT last_update, price
+                FROM market_parameters_minutes
+                WHERE name = 'ND'
+                ORDER BY last_update
+            """)
+        )
+        nd_rows = nd_result.fetchall()
+
+        total_buys_fee = 0
+        if tx_rows and nd_rows:
+            nd_timestamps = np.array([row.last_update.timestamp() for row in nd_rows])
+            nd_prices = np.array([float(row.price) for row in nd_rows])
+
+            tx_timestamps = np.array([row.created_at.timestamp() for row in tx_rows])
+            tx_amounts = np.array([float(row.amount) for row in tx_rows])
+
+            # Find closest ND index for each transaction
+            indices = np.searchsorted(nd_timestamps, tx_timestamps, side='right') - 1
+            indices = np.clip(indices, 0, len(nd_timestamps) - 1)
+
+            # For boundary cases, check if the next index is actually closer
+            next_indices = np.minimum(indices + 1, len(nd_timestamps) - 1)
+            diff_left = np.abs(tx_timestamps - nd_timestamps[indices])
+            diff_right = np.abs(tx_timestamps - nd_timestamps[next_indices])
+            closest_indices = np.where(diff_right < diff_left, next_indices, indices)
+
+            closest_nd_prices = nd_prices[closest_indices]
+            fee_per_token = np.floor(0.02 * closest_nd_prices)
+            total_buys_fee = int(np.sum(tx_amounts * fee_per_token))
 
         result = await session.execute(
             text(f"SELECT COUNT(DISTINCT public_key) AS unique_buyers FROM pending_txes WHERE status = '0' AND code = 'PMN'{df}"),
@@ -58,7 +92,7 @@ async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_
                 {"key": "total_volume", "label": "حجم کل PMN", "value": float(total_volume), "format": "number"},
                 {"key": "total_revenue", "label": "مجموع ریالی", "value": int(total_revenue), "format": "rial"},
                 {"key": "avg_amount", "label": "میانگین مقدار خرید", "value": float(avg_amount), "format": "decimal"},
-                {"key": "success_rate", "label": "نرخ موفقیت", "value": float(success_rate), "format": "percent"},
+                {"key": "total_buys_fee", "label": "مجموع کارمزد", "value": int(total_buys_fee), "format": "rial"},
                 {"key": "unique_buyers", "label": "تعداد خریداران منحصر به فرد", "value": int(unique_buyers), "format": "number"},
             ]
         }
