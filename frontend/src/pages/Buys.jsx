@@ -100,7 +100,7 @@ export default function Buys() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4 text-gray-900">خرید / پرداخت‌ها</h2>
+      <h2 className="text-2xl font-bold mb-4 text-gray-900">فروش / پرداخت‌ها</h2>
       <DateFilter onApply={handleDateApply} />
 
       {/* KPI Cards Grid */}

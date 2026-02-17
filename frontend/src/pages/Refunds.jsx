@@ -86,7 +86,7 @@ export default function Refunds() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4 text-gray-900">بازپرداخت‌ها</h2>
+      <h2 className="text-2xl font-bold mb-4 text-gray-900">بازخریدها</h2>
       <DateFilter onApply={handleDateApply} />
 
       {/* KPI Cards Grid */}
@@ -142,7 +142,7 @@ export default function Refunds() {
           }}
         />
         <ChartCard
-          title="تعداد بازپرداخت‌ها در روز"
+          title="تعداد بازخریدها در روز"
           loading={loading}
           option={{
             xAxis: { type: 'category', data: dailyCount.map((d) => toJalali(d.date)) },
@@ -151,7 +151,7 @@ export default function Refunds() {
           }}
         />
         <ChartCard
-          title="روند ماهانه بازپرداخت‌ها"
+          title="روند ماهانه بازخریدها"
           loading={loading}
           option={{
             xAxis: { type: 'category', data: monthlyTrend.map((d) => toJalaliMonth(d.date)) },
@@ -160,7 +160,7 @@ export default function Refunds() {
           }}
         />
         <ChartCard
-          title="توزیع وضعیت بازپرداخت‌ها"
+          title="توزیع وضعیت بازخریدها"
           loading={loading}
           option={{
             xAxis: { show: false },
@@ -170,7 +170,7 @@ export default function Refunds() {
           }}
         />
         <ChartCard
-          title="توزیع بازپرداخت‌ها براساس بانک"
+          title="توزیع بازخریدها براساس بانک"
           loading={loading}
           option={{
             xAxis: { type: 'category', data: byBank.map((b) => b.name) },

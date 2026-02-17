@@ -46,11 +46,11 @@ If running separately:
 
 The application has 6 pages accessible from the right-side sidebar:
 
-1. **بازپرداخت‌ها (Refunds)** - `/refunds`
+1. **بازخریدها (Refunds)** - `/refunds`
    - 7 KPI cards
    - 6 charts showing refund analytics
 
-2. **خرید / پرداخت‌ها (Buys/Payments)** - `/buys`
+2. **فروش / پرداخت‌ها (Buys/Payments)** - `/buys`
    - 6 KPI cards
    - 6 charts showing purchase analytics
 

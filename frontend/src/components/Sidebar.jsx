@@ -3,8 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeftCircle, ShoppingCart, Users, LayoutGrid, ChevronRight, Calculator } from 'lucide-react';
 
 const menuItems = [
-  { key: 'refunds', label: 'بازپرداخت‌ها', path: '/refunds', icon: ArrowLeftCircle },
-  { key: 'buys', label: 'خرید / پرداخت‌ها', path: '/buys', icon: ShoppingCart },
+  { key: 'refunds', label: 'بازخریدها', path: '/refunds', icon: ArrowLeftCircle },
+  { key: 'buys', label: 'فروش / پرداخت‌ها', path: '/buys', icon: ShoppingCart },
   { key: 'users', label: 'تحلیل کاربران', path: '/users', icon: Users },
   { key: 'section-a', label: 'حسابداری', path: '/section-a', icon: Calculator },
   { key: 'section-b', label: 'بخش B', path: '/section-b', icon: LayoutGrid },
