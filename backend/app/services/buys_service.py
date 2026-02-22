@@ -64,7 +64,7 @@ async def get_daily_count(session: AsyncSession, start_date: Optional[str] = Non
 
         result = await session.execute(
             text(f"""
-                SELECT DATE(created_at) AS day, COUNT(*) AS count
+                SELECT DATE(created_at) AS day, COALESCE(SUM(amount), 0) AS total_amount
                 FROM pending_txes
                 WHERE status = '0' AND code = 'PMN'{time_filter}
                 GROUP BY DATE(created_at)
@@ -75,7 +75,7 @@ async def get_daily_count(session: AsyncSession, start_date: Optional[str] = Non
         rows = result.fetchall()
 
         return {
-            "series": [{"date": str(row.day), "value": int(row.count)} for row in rows]
+            "series": [{"date": str(row.day), "value": float(row.total_amount)} for row in rows]
         }
 
     except Exception as e:

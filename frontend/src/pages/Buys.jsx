@@ -120,12 +120,12 @@ export default function Buys() {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard
-          title="تعداد خریدها در روز"
+          title="حجم PMN خریداری شده در روز"
           loading={loading}
           option={{
             xAxis: { type: 'category', data: dailyCount.map((d) => toJalali(d.date)) },
             yAxis: { type: 'value' },
-            series: [{ name: 'تعداد', type: 'line', data: dailyCount.map((d) => d.value), color: chartColors[0], smooth: true }],
+            series: [{ name: 'حجم PMN', type: 'line', data: dailyCount.map((d) => d.value), color: chartColors[0], smooth: true }],
           }}
         />
         <ChartCard
