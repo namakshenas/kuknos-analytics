@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.database import get_session
 from app.services import users_service
-from app.schemas.analytics import KPIResponse, SeriesResponse, DistributionResponse, TopUsersResponse, BuySellComparisonResponse
+from app.schemas.analytics import KPIResponse, SeriesResponse, DistributionResponse, TopUsersResponse, BuySellComparisonResponse, PendingUsersResponse
 
 router = APIRouter()
 
@@ -69,3 +69,58 @@ async def get_buy_sell_comparison(
     session: AsyncSession = Depends(get_session),
 ):
     return await users_service.get_buy_sell_comparison(session, start_date, end_date)
+
+
+@router.get("/pending-users", response_model=PendingUsersResponse)
+async def get_pending_users(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    public: Optional[str] = Query(None),
+    national_id: Optional[str] = Query(None),
+    first_name: Optional[str] = Query(None),
+    last_name: Optional[str] = Query(None),
+    iban: Optional[str] = Query(None),
+    cardnumber: Optional[str] = Query(None),
+    mobile: Optional[str] = Query(None),
+    session: AsyncSession = Depends(get_session),
+):
+    filters = {}
+    for key, val in [
+        ("public", public),
+        ("national_id", national_id),
+        ("first_name", first_name),
+        ("last_name", last_name),
+        ("iban", iban),
+        ("cardnumber", cardnumber),
+        ("mobile", mobile),
+    ]:
+        if val:
+            filters[key] = val
+    return await users_service.get_pending_users(session, page, page_size, filters or None)
+
+
+@router.get("/pending-users/export")
+async def export_pending_users(
+    public: Optional[str] = Query(None),
+    national_id: Optional[str] = Query(None),
+    first_name: Optional[str] = Query(None),
+    last_name: Optional[str] = Query(None),
+    iban: Optional[str] = Query(None),
+    cardnumber: Optional[str] = Query(None),
+    mobile: Optional[str] = Query(None),
+    session: AsyncSession = Depends(get_session),
+):
+    filters = {}
+    for key, val in [
+        ("public", public),
+        ("national_id", national_id),
+        ("first_name", first_name),
+        ("last_name", last_name),
+        ("iban", iban),
+        ("cardnumber", cardnumber),
+        ("mobile", mobile),
+    ]:
+        if val:
+            filters[key] = val
+    data = await users_service.get_pending_users_export(session, filters or None)
+    return {"data": data}

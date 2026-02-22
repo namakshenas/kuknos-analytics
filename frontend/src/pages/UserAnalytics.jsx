@@ -5,6 +5,7 @@ import ChartCard from '../components/ChartCard';
 import DateFilter, { getDefaultDateRange } from '../components/DateFilter';
 import { chartColors } from '../utils/chartDefaults';
 import { toJalaliMonth } from '../utils/formatters';
+import PendingUsersTable from '../components/PendingUsersTable';
 
 export default function UserAnalytics() {
   const defaults = getDefaultDateRange();
@@ -161,6 +162,9 @@ export default function UserAnalytics() {
           }}
         />
       </div>
+
+      {/* Pending Users Table */}
+      <PendingUsersTable />
     </div>
   );
 }

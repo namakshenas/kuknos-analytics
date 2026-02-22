@@ -59,13 +59,13 @@ async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_
             "kpis": [
                 {"key": "total_completed", "label": "تعداد بازخریدهای تکمیل شده", "value": int(total_completed), "format": "number"},
                 {"key": "total_pending", "label": "تعداد بازخریدهای در انتظار", "value": int(total_pending), "format": "number"},
-                {"key": "total_num_pmn_pending", "label": "حجم کل PMN در انتظار پرداخت", "value": int(total_num_pmn_pending), "format": "number"},
+                {"key": "total_num_pmn_pending", "label": "حجم کل PMN در انتظار بازخرید", "value": int(total_num_pmn_pending), "format": "number"},
                 {"key": "pending_amount", "label": "مجموع بازخریدهای در انتظار", "value": int(pending_amount), "format": "rial"},
-                {"key": "total_sold", "label": "حجم کل PMN فروخته شده", "value": float(total_sold), "format": "number"},
-                {"key": "total_payout", "label": "مجموع پرداختی (ریال)", "value": int(total_payout), "format": "rial"},
+                {"key": "total_sold", "label": "حجم کل PMN بازخرید شده", "value": float(total_sold), "format": "number"},
+                {"key": "total_payout", "label": "مجموع بازخرید (ریال)", "value": int(total_payout), "format": "rial"},
                 {"key": "total_fees", "label": "مجموع کارمزد", "value": int(total_fees), "format": "rial"},
-                {"key": "avg_amount", "label": "میانگین مقدار بازپرداخت", "value": float(avg_amount), "format": "decimal"},
-                {"key": "unique_sellers", "label": "تعداد فروشندگان منحصر به فرد", "value": int(unique_sellers), "format": "number"},
+                {"key": "avg_amount", "label": "میانگین مقدار بازخرید", "value": float(avg_amount), "format": "decimal"},
+                {"key": "unique_sellers", "label": "تعداد بازخریدکنندگان منحصر به فرد", "value": int(unique_sellers), "format": "number"},
             ]
         }
 

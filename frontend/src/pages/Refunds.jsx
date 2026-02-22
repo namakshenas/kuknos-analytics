@@ -106,7 +106,7 @@ export default function Refunds() {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard
-          title="نرخ بازپرداخت روزانه"
+          title="نرخ بازخرید روزانه"
           loading={loading}
           option={{
             grid: { left: '2%', right: '5%', containLabel: true },
@@ -128,7 +128,7 @@ export default function Refunds() {
             },
             series: [
               {
-                name: 'نرخ بازپرداخت',
+                name: 'نرخ بازخرید',
                 type: 'candlestick',
                 data: rateCandlestick.map((d) => [d.open, d.close, d.low, d.high]),
                 itemStyle: {
@@ -179,7 +179,7 @@ export default function Refunds() {
           }}
         />
         <ChartCard
-          title="توزیع مقدار بازپرداخت"
+          title="توزیع مقدار بازخرید"
           loading={loading}
           option={{
             xAxis: { type: 'category', data: amountDist.map((a) => a.name) },
@@ -188,7 +188,7 @@ export default function Refunds() {
           }}
         />
         <ChartCard
-          title="روند نرخ بازپرداخت"
+          title="روند نرخ بازخرید"
           loading={loading}
           option={{
             xAxis: { type: 'category', data: rateTrend.map((d) => toJalali(d.date)) },

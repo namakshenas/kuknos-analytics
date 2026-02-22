@@ -99,3 +99,26 @@ class CandlestickResponse(BaseModel):
     """Response model for candlestick chart endpoints"""
 
     series: List[CandlestickPoint]
+
+
+class PendingUserItem(BaseModel):
+    """A user with pending (unpaid) refund"""
+
+    public: Optional[str] = None
+    national_id: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    iban: Optional[str] = None
+    cardnumber: Optional[str] = None
+    mobile: Optional[str] = None
+    refund_price: Optional[float] = None
+    amount: Optional[float] = None
+
+
+class PendingUsersResponse(BaseModel):
+    """Paginated response for pending users table"""
+
+    data: List[PendingUserItem]
+    total: int
+    page: int
+    page_size: int
