@@ -1,7 +1,9 @@
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.database import engine
+from sqlalchemy import text
+from app.database import engine, AsyncSessionLocal
 from app.logger import setup_logger
 from app.routers import buys, refunds, users
 
@@ -52,3 +54,14 @@ async def root():
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+
+@app.get("/api/health/db")
+async def db_health():
+    """Check database connectivity — forces a fresh connection each time"""
+    try:
+        async with engine.connect() as conn:
+            await asyncio.wait_for(conn.execute(text("SELECT 1")), timeout=3.0)
+        return {"connected": True}
+    except Exception:
+        return {"connected": False}

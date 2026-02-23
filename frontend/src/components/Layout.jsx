@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
+import DbStatus from './DbStatus';
 
 /**
  * Layout component - defines the overall RTL structure with header and sidebar
@@ -13,6 +14,9 @@ export default function Layout({ children }) {
       <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10 shadow-sm flex items-center gap-3">
         <img src="/kuknos_co_logo.jpeg" alt="ققنوس" className="h-8 w-8 object-contain" />
         <h1 className="text-2xl font-bold text-gray-900">ققنوس آنالتیکس</h1>
+        <div className="mr-auto">
+          <DbStatus />
+        </div>
       </header>
 
       {/* Main container with sidebar and content */}
