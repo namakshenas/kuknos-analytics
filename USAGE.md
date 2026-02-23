@@ -47,18 +47,22 @@ If running separately:
 The application has 6 pages accessible from the right-side sidebar:
 
 1. **بازخریدها (Refunds)** - `/refunds`
-   - 7 KPI cards
-   - 6 charts showing refund analytics
+   - KPI cards (incl. pending PMN count/amount)
+   - Charts: daily count, monthly trend, rate trend, rate candlestick, status distribution, by-bank, amount distribution
+   - Pending refunds detail table (via `PendingUsersTable`)
 
 2. **فروش / پرداخت‌ها (Buys/Payments)** - `/buys`
-   - 6 KPI cards
-   - 6 charts showing purchase analytics
+   - KPI cards (incl. lazily-loaded buy fee)
+   - Charts: daily count, daily volume, monthly trend, exchange rate trend, by-gateway, by-application, status distribution, amount distribution
+   - Date range filter on all charts/KPIs
 
 3. **تحلیل کاربران (User Analytics)** - `/users`
-   - 2 KPI cards
-   - 6 charts showing user behavior
+   - KPI cards
+   - Charts: new users per month, top buyers/sellers, activity distribution, monthly active, buy-sell comparison
+   - Pending users table with column filters and Excel export
 
-4. **بخش A, B, C** - Placeholder pages for future features
+4. **حسابداری** - `/section-a` — Placeholder
+5. **بخش B, C** - Placeholder pages for future features
 
 ## Common Issues & Solutions
 

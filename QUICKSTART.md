@@ -43,10 +43,11 @@ Press `Ctrl+C` once (cleans up both processes automatically)
 
 Click the sidebar items (on the right side):
 
-1. **بازخریدها** - Refunds analytics
+1. **بازخریدها** - Refunds analytics (with pending refunds table)
 2. **فروش / پرداخت‌ها** - Buys/payments analytics
-3. **تحلیل کاربران** - User analytics
-4. **بخش A, B, C** - Placeholder pages
+3. **تحلیل کاربران** - User analytics (with pending users table)
+4. **حسابداری** - Accounting (placeholder)
+5. **بخش B, C** - Placeholder pages
 
 ## Troubleshooting
 
