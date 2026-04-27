@@ -1,9 +1,11 @@
+@import '@fontsource-variable/vazirmatn';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  font-family: 'Vazirmatn', sans-serif;
+  font-family: 'Vazirmatn Variable', sans-serif;
   direction: rtl;
   margin: 0;
   padding: 0;

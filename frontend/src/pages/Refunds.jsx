@@ -166,7 +166,7 @@ export default function Refunds() {
             xAxis: { show: false },
             yAxis: { show: false },
             tooltip: { trigger: 'item' },
-            series: [{ type: 'pie', radius: '60%', data: statusDist.map((s) => ({ name: s.name, value: s.value })), color: chartColors, label: { fontFamily: 'Vazirmatn' } }],
+            series: [{ type: 'pie', radius: '60%', data: statusDist.map((s) => ({ name: s.name, value: s.value })), color: chartColors, label: { fontFamily: 'Vazirmatn Variable' } }],
           }}
         />
         <ChartCard

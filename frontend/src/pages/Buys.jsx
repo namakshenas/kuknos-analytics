@@ -144,7 +144,7 @@ export default function Buys() {
             xAxis: { show: false },
             yAxis: { show: false },
             tooltip: { trigger: 'item' },
-            series: [{ type: 'pie', radius: '60%', data: byGateway.map((g) => ({ name: g.name, value: g.count })), color: chartColors, label: { fontFamily: 'Vazirmatn' } }],
+            series: [{ type: 'pie', radius: '60%', data: byGateway.map((g) => ({ name: g.name, value: g.count })), color: chartColors, label: { fontFamily: 'Vazirmatn Variable' } }],
           }}
         />
         <ChartCard

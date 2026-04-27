@@ -6,11 +6,11 @@ import { formatNumber, toPersianDigits } from './formatters';
  */
 export const persianChartDefaults = {
   textStyle: {
-    fontFamily: 'Vazirmatn, sans-serif',
+    fontFamily: '"Vazirmatn Variable", sans-serif',
     fontSize: 12,
   },
   tooltip: {
-    textStyle: { fontFamily: 'Vazirmatn' },
+    textStyle: { fontFamily: 'Vazirmatn Variable' },
     trigger: 'axis',
     formatter: (params) => {
       if (Array.isArray(params)) {
@@ -33,7 +33,7 @@ export const persianChartDefaults = {
   },
   xAxis: {
     axisLabel: {
-      fontFamily: 'Vazirmatn, sans-serif',
+      fontFamily: '"Vazirmatn Variable", sans-serif',
       rotate: 45,
       fontSize: 10,
       margin: 20,  // More space between label and axis
@@ -46,7 +46,7 @@ export const persianChartDefaults = {
   },
   yAxis: {
     axisLabel: {
-      fontFamily: 'Vazirmatn, sans-serif',
+      fontFamily: '"Vazirmatn Variable", sans-serif',
       fontSize: 11,
       margin: 20,  // Move labels further left to avoid overlap
       formatter: (value) => {

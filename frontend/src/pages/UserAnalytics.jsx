@@ -128,7 +128,7 @@ export default function UserAnalytics() {
             xAxis: { show: false },
             yAxis: { show: false },
             tooltip: { trigger: 'item' },
-            series: [{ type: 'pie', radius: '60%', data: activityDist.map((a) => ({ name: a.name, value: a.value })), color: chartColors, label: { fontFamily: 'Vazirmatn' } }],
+            series: [{ type: 'pie', radius: '60%', data: activityDist.map((a) => ({ name: a.name, value: a.value })), color: chartColors, label: { fontFamily: 'Vazirmatn Variable' } }],
           }}
         />
         <ChartCard
