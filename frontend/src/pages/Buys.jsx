@@ -1,176 +1,185 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import client from '../api/client';
-import KPICard from '../components/KPICard';
+import KPICard, { KPICardSkeleton } from '../components/KPICard';
 import ChartCard from '../components/ChartCard';
-import DateFilter, { getDefaultDateRange } from '../components/DateFilter';
+import DateFilter from '../components/DateFilter';
+import { getDefaultDateRange } from '../utils/dateRange';
 import TokenFilter from '../components/TokenFilter';
-import { chartColors } from '../utils/chartDefaults';
-import { toJalali, toJalaliShort, toJalaliMonth } from '../utils/formatters';
+import { ErrorState, PageHeader } from '../components/ui';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { chartColors, preset, withZoom } from '../utils/chartTheme';
+import { toJalali } from '../utils/formatters';
 import { DEFAULT_TOKEN } from '../utils/tokens';
+
+const ENDPOINTS = {
+  kpis: '/buys/kpis',
+  dailyCount: '/buys/daily-count',
+  dailyVolume: '/buys/daily-volume',
+  monthlyTrend: '/buys/monthly-trend',
+  exchangeRate: '/buys/exchange-rate-trend',
+  byGateway: '/buys/by-gateway',
+  byApplication: '/buys/by-application',
+  amountDist: '/buys/amount-distribution',
+};
+
+const KPI_COUNT = 6;
 
 export default function Buys() {
   const defaults = getDefaultDateRange();
-  const [startDate, setStartDate] = useState(defaults.gregorianStart);
-  const [endDate, setEndDate] = useState(defaults.gregorianEnd);
+  const [range, setRange] = useState({
+    start_date: defaults.gregorianStart,
+    end_date: defaults.gregorianEnd,
+  });
   const [token, setToken] = useState(DEFAULT_TOKEN);
+  const [fee, setFee] = useState({ key: null, kpi: null });
 
-  const [kpis, setKpis] = useState([]);
-  const [dailyCount, setDailyCount] = useState([]);
-  const [dailyVolume, setDailyVolume] = useState([]);
-  const [monthlyTrend, setMonthlyTrend] = useState([]);
-  const [exchangeRate, setExchangeRate] = useState([]);
-  const [byGateway, setByGateway] = useState([]);
-  const [byApplication, setByApplication] = useState([]);
-  const [amountDist, setAmountDist] = useState([]);
+  /* Chart titles name the token as well, matching the KPI labels the API
+     returns — so no card on this page is ambiguous on its own. */
+  const withToken = (title) => `${title} (${token})`;
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const params = { ...range, token };
+  const paramsKey = JSON.stringify(params);
+  const { data, errors, loading, fatalError, refetch } = useAnalytics(ENDPOINTS, params);
 
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const params = { start_date: startDate, end_date: endDate, token };
+  const kpis = data.kpis?.kpis ?? [];
+  const hasFeeKpi = kpis.some((k) => k.key === 'total_buys_fee');
 
-      const [
-        kpisRes, dailyCountRes, dailyVolumeRes, monthlyRes,
-        rateRes, gatewayRes, appRes, amountRes,
-      ] = await Promise.all([
-        client.get('/buys/kpis', { params }),
-        client.get('/buys/daily-count', { params }),
-        client.get('/buys/daily-volume', { params }),
-        client.get('/buys/monthly-trend', { params }),
-        client.get('/buys/exchange-rate-trend', { params }),
-        client.get('/buys/by-gateway', { params }),
-        client.get('/buys/by-application', { params }),
-        client.get('/buys/amount-distribution', { params }),
-      ]);
-
-      setKpis(kpisRes.data.kpis);
-
-      // Lazy-load expensive fee KPI separately (only offered for tokens with a fee price series)
-      if (kpisRes.data.kpis.some((kpi) => kpi.key === 'total_buys_fee')) {
-        client.get('/buys/total-fee', { params }).then((feeRes) => {
-          setKpis((prev) =>
-            prev.map((kpi) =>
-              kpi.key === 'total_buys_fee' ? { ...kpi, ...feeRes.data.kpi, lazy: false } : kpi
-            )
-          );
-        }).catch((err) => {
-          console.error('Error fetching buys fee:', err);
-        });
-      }
-
-      setDailyCount(dailyCountRes.data.series);
-      setDailyVolume(dailyVolumeRes.data.series);
-      setMonthlyTrend(monthlyRes.data.series);
-      setExchangeRate(rateRes.data.series);
-      setByGateway(gatewayRes.data.data);
-      setByApplication(appRes.data.data);
-      setAmountDist(amountRes.data.data);
-    } catch (err) {
-      console.error('Error fetching buys data:', err);
-      if (err.response?.status === 503) {
-        setError('خطا در اتصال به پایگاه داده');
-      } else {
-        setError('خطا در دریافت اطلاعات');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [startDate, endDate, token]);
-
+  /*
+   * The fee KPI is expensive — it matches every transaction against a
+   * minute-resolution price series — so it loads on its own and patches
+   * itself in. Only tokens with a fee price series expose the card at all.
+   *
+   * The `loading` guard matters: while a new token's KPIs are in flight the
+   * hook still serves the previous token's list, so `hasFeeKpi` would be
+   * stale-true and we'd request a fee for a token that has none (HTTP 400).
+   */
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (loading || !hasFeeKpi) return;
+    const controller = new AbortController();
+    client
+      .get('/buys/total-fee', { params: JSON.parse(paramsKey), signal: controller.signal })
+      .then((res) => setFee({ key: paramsKey, kpi: res.data.kpi }))
+      .catch((err) => {
+        if (!controller.signal.aborted) console.error('Error fetching buys fee:', err.message);
+      });
+    return () => controller.abort();
+  }, [loading, hasFeeKpi, paramsKey]);
 
-  const handleDateApply = (start, end) => {
-    setStartDate(start);
-    setEndDate(end);
-  };
+  // Keyed by params, so a fee fetched for a different token or date range is
+  // never shown against the current one.
+  const currentFee = fee.key === paramsKey ? fee.kpi : null;
+  const resolvedKpis = kpis.map((kpi) =>
+    kpi.key === 'total_buys_fee' && currentFee ? { ...kpi, ...currentFee, lazy: false } : kpi
+  );
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-        <p className="text-red-600 mb-4">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-        >
-          تلاش مجدد
-        </button>
-      </div>
-    );
-  }
+  const dailyCount = data.dailyCount?.series ?? [];
+  const dailyVolume = data.dailyVolume?.series ?? [];
+  const byGateway = data.byGateway?.data ?? [];
+  const byApplication = data.byApplication?.data ?? [];
+  const amountDist = data.amountDist?.data ?? [];
+  const exchangeRate = data.exchangeRate?.series ?? [];
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4 text-gray-900">فروش / پرداخت‌ها</h2>
-      <DateFilter onApply={handleDateApply}>
+      <PageHeader title="فروش / پرداخت‌ها" />
+
+      <DateFilter onApply={(start_date, end_date) => setRange({ start_date, end_date })}>
         <TokenFilter value={token} onChange={setToken} />
       </DateFilter>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      {fatalError && <ErrorState message={fatalError} onRetry={refetch} className="mb-5" />}
+
+      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {loading
-          ? Array(6)
-              .fill(0)
-              .map((_, i) => (
-                <div key={i} className="bg-white p-6 rounded-xl shadow-sm animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              ))
-          : kpis.map((kpi) => <KPICard key={kpi.key} {...kpi} />)}
+          ? Array.from({ length: KPI_COUNT }, (_, i) => <KPICardSkeleton key={i} />)
+          : resolvedKpis.map(({ key, ...kpi }) => <KPICard key={key} {...kpi} />)}
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <ChartCard
-          title={`حجم ${token} خریداری شده در روز`}
+          title={withToken("حجم خریداری شده در روز")}
           loading={loading}
-          option={{
-            xAxis: { type: 'category', data: dailyCount.map((d) => toJalali(d.date)) },
-            yAxis: { type: 'value' },
-            series: [{ name: `حجم ${token}`, type: 'line', data: dailyCount.map((d) => d.value), color: chartColors[0], smooth: true }],
-          }}
+          error={errors.dailyCount}
+          onRetry={refetch}
+          option={withZoom(
+            preset.line({
+              name: `حجم ${token}`,
+              categories: dailyCount.map((d) => toJalali(d.date)),
+              data: dailyCount.map((d) => d.value),
+              color: chartColors[0],
+              area: true,
+            })
+          )}
         />
+
+        {/* "حجم ریالی" rather than "(ریال)": the token suffix would otherwise
+            produce two parenthesised groups in a row. */}
         <ChartCard
-          title="حجم خرید روزانه (ریال)"
+          title={withToken("حجم ریالی خرید روزانه")}
           loading={loading}
-          option={{
-            xAxis: { type: 'category', data: dailyVolume.map((d) => toJalali(d.date)) },
-            yAxis: { type: 'value' },
-            series: [{ name: 'حجم (ریال)', type: 'line', data: dailyVolume.map((d) => d.value), color: chartColors[1], smooth: true, areaStyle: { opacity: 0.3 } }],
-          }}
+          error={errors.dailyVolume}
+          onRetry={refetch}
+          option={withZoom(
+            preset.line({
+              name: 'حجم (ریال)',
+              categories: dailyVolume.map((d) => toJalali(d.date)),
+              data: dailyVolume.map((d) => d.value),
+              color: chartColors[1],
+              area: true,
+            })
+          )}
         />
+
         <ChartCard
-          title="توزیع براساس درگاه پرداخت"
+          title={withToken("روند نرخ خرید")}
           loading={loading}
-          option={{
-            xAxis: { show: false },
-            yAxis: { show: false },
-            tooltip: { trigger: 'item' },
-            series: [{ type: 'pie', radius: '60%', data: byGateway.map((g) => ({ name: g.name, value: g.count })), color: chartColors, label: { fontFamily: 'Vazirmatn Variable' } }],
-          }}
+          error={errors.exchangeRate}
+          onRetry={refetch}
+          option={withZoom(
+            preset.line({
+              name: 'نرخ میانگین',
+              categories: exchangeRate.map((d) => toJalali(d.date)),
+              data: exchangeRate.map((d) => d.value),
+              color: chartColors[6],
+            })
+          )}
         />
+
         <ChartCard
-          title="توزیع براساس اپلیکیشن"
+          title={withToken("توزیع براساس درگاه پرداخت")}
           loading={loading}
-          option={{
-            xAxis: { type: 'category', data: byApplication.map((a) => a.name) },
-            yAxis: { type: 'value' },
-            series: [{ name: 'تعداد', type: 'bar', data: byApplication.map((a) => a.value), color: chartColors[2] }],
-          }}
+          error={errors.byGateway}
+          onRetry={refetch}
+          option={preset.pie({
+            name: 'درگاه',
+            data: byGateway.map((g) => ({ name: g.name, value: g.count })),
+          })}
         />
+
         <ChartCard
-          title="توزیع مقدار خرید"
+          title={withToken("توزیع براساس اپلیکیشن")}
           loading={loading}
-          option={{
-            xAxis: { type: 'category', data: amountDist.map((a) => a.name) },
-            yAxis: { type: 'value' },
-            series: [{ name: 'تعداد', type: 'bar', data: amountDist.map((a) => a.value), color: chartColors[3] }],
-          }}
+          error={errors.byApplication}
+          onRetry={refetch}
+          option={preset.bar({
+            name: 'تعداد',
+            categories: byApplication.map((a) => a.name),
+            data: byApplication.map((a) => a.value),
+            color: chartColors[2],
+          })}
+        />
+
+        <ChartCard
+          title={withToken("توزیع مقدار خرید")}
+          loading={loading}
+          error={errors.amountDist}
+          onRetry={refetch}
+          option={preset.bar({
+            name: 'تعداد',
+            categories: amountDist.map((a) => a.name),
+            data: amountDist.map((a) => a.value),
+            color: chartColors[3],
+          })}
         />
       </div>
     </div>

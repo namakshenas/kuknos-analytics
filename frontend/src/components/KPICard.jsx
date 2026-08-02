@@ -1,41 +1,54 @@
-import React from 'react';
 import { formatNumber, formatRial, formatPercent, formatDecimal } from '../utils/formatters';
+import { Card, Skeleton } from './ui';
+
+const FORMATTERS = {
+  rial: formatRial,
+  percent: formatPercent,
+  decimal: formatDecimal,
+  number: formatNumber,
+};
 
 /**
- * KPI Card component - displays a single metric with label and formatted value
+ * A single metric. `lazy` covers the progressively-loaded fee KPI, which
+ * arrives after the main batch.
  */
-export default function KPICard({ label, value, format, icon, lazy }) {
-  const formatValue = () => {
-    switch (format) {
-      case 'rial':
-        return formatRial(value);
-      case 'percent':
-        return formatPercent(value);
-      case 'decimal':
-        return formatDecimal(value);
-      case 'number':
-      default:
-        return formatNumber(value);
-    }
-  };
+export default function KPICard({ label, value, format, icon: Icon, lazy }) {
+  const formatValue = FORMATTERS[format] ?? formatNumber;
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm text-gray-600 mb-2">{label}</p>
+    <Card padding="sm" className="transition-shadow duration-base hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="mb-1.5 text-sm text-content-muted">{label}</p>
           {lazy ? (
-            <div className="h-8 bg-gray-200 rounded w-1/2 animate-pulse"></div>
+            <Skeleton className="h-7 w-2/3" />
           ) : (
-            <p className="text-2xl font-bold text-gray-900">{formatValue()}</p>
+            <p className="truncate text-2xl font-bold text-content" title={formatValue(value)}>
+              {formatValue(value)}
+            </p>
           )}
         </div>
-        {icon && (
-          <div className="text-indigo-600 opacity-80">
-            {icon}
+        {Icon && (
+          <div className="rounded-lg bg-primary-soft p-2 text-primary">
+            <Icon size={18} aria-hidden="true" />
           </div>
         )}
       </div>
-    </div>
+    </Card>
+  );
+}
+
+/**
+ * Loading placeholder with the same padding, line count and line heights as
+ * the real card — so the swap causes no layout shift. The pages previously
+ * inlined their own version that omitted the border, which made every card
+ * flicker its outline on load.
+ */
+export function KPICardSkeleton() {
+  return (
+    <Card padding="sm">
+      <Skeleton className="mb-2 h-5 w-3/4" />
+      <Skeleton className="h-7 w-1/2" />
+    </Card>
   );
 }

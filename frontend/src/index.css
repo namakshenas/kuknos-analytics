@@ -4,11 +4,106 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: 'Vazirmatn Variable', sans-serif;
-  direction: rtl;
-  margin: 0;
-  padding: 0;
+/*
+ * Design tokens — single source of truth for the whole UI.
+ *
+ * Values are raw RGB channels so Tailwind can apply opacity modifiers
+ * (`bg-primary/10`, `border-border/50`, …) via rgb(var(--x) / <alpha-value>).
+ *
+ * Brand hue is anchored to the Kuknos logo (blue → violet gradient), so
+ * indigo stays the primary. Amber is the secondary accent for highlights.
+ * A dark theme drops in later by overriding this block under
+ * `:root[data-theme='dark']` — no component changes required.
+ */
+:root {
+  /* Surfaces */
+  --color-bg: 248 250 252;            /* page background   – slate-50  */
+  --color-surface: 255 255 255;       /* cards, header, sidebar        */
+  --color-surface-muted: 248 250 252; /* table headers, filter rows    */
+  --color-surface-hover: 241 245 249; /* row / item hover  – slate-100 */
+
+  /* Borders */
+  --color-border: 226 232 240;        /* default hairline  – slate-200 */
+  --color-border-strong: 203 213 225; /* inputs, dividers  – slate-300 */
+
+  /* Text — all three pass WCAG AA (4.5:1) on --color-surface */
+  --color-text: 15 23 42;             /* headings, values  – slate-900 15.6:1 */
+  --color-text-muted: 71 85 105;      /* labels, body      – slate-600  7.4:1 */
+  --color-text-subtle: 100 116 139;   /* captions, meta    – slate-500  4.8:1 */
+
+  /* Brand */
+  --color-primary: 79 70 229;         /* indigo-600 */
+  --color-primary-hover: 67 56 202;   /* indigo-700 */
+  --color-primary-soft: 238 242 255;  /* indigo-50  – active nav, selected pill */
+  --color-on-primary: 255 255 255;
+
+  /* Accent (secondary emphasis, never a status) */
+  --color-accent: 217 119 6;          /* amber-600 */
+  --color-accent-soft: 255 251 235;   /* amber-50  */
+
+  /* Status */
+  --color-success: 22 163 74;         /* green-600 */
+  --color-success-soft: 240 253 244;
+  --color-warning: 217 119 6;         /* amber-600 */
+  --color-warning-soft: 255 251 235;
+  --color-danger: 220 38 38;          /* red-600   */
+  --color-danger-soft: 254 242 242;
+
+  /* Focus ring */
+  --color-ring: 79 70 229;
+
+  /* Dashboard chrome metrics — from the skill's "Data-Dense Dashboard" style.
+     Padding/gap are loosened from its 12px/8px because Persian letterforms
+     need more breathing room than Latin at the same size. */
+  --header-height: 4.25rem;           /* 68px — the skill's dense-dashboard
+                                         spec says 56px, but that crowded the
+                                         logo, title and status indicator */
+  --sidebar-width: 15rem;             /* 240px */
+  --sidebar-width-collapsed: 3.5rem;  /* 56px  */
+  --table-row-height: 2.25rem;        /* 36px  */
+
+  /* Motion — one rhythm for the whole app (skill rule: 150–300ms) */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    direction: rtl;
+    font-family: 'Vazirmatn Variable', sans-serif;
+    background-color: rgb(var(--color-bg));
+    color: rgb(var(--color-text));
+    /* Persian digits stay column-aligned in tables and KPI cards */
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* One visible focus ring for every interactive element (skill rule
+     `focus-states`, severity HIGH — the app previously had none). */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid rgb(var(--color-ring));
+    outline-offset: 2px;
+    border-radius: 0.375rem;
+  }
+
+  /* Keyboard-only: don't ring on mouse clicks */
+  :where(a, button, input, select, textarea):focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+/* Scrollbars, themed from the tokens instead of hardcoded grey */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--color-border-strong)) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -17,14 +112,30 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #888;
+  background: rgb(var(--color-border-strong));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: rgb(var(--color-text-subtle));
+}
+
+/* Skill rule `reduced-motion` / `animation-optional`: honour the OS setting.
+   Data must still be readable instantly, so we kill motion, not content. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

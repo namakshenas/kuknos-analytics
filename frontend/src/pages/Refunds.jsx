@@ -1,205 +1,175 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import client from '../api/client';
-import KPICard from '../components/KPICard';
+import { useState } from 'react';
+import KPICard, { KPICardSkeleton } from '../components/KPICard';
 import ChartCard from '../components/ChartCard';
-import DateFilter, { getDefaultDateRange } from '../components/DateFilter';
+import DateFilter from '../components/DateFilter';
+import { getDefaultDateRange } from '../utils/dateRange';
 import TokenFilter from '../components/TokenFilter';
-import { chartColors } from '../utils/chartDefaults';
-import { toJalali, toJalaliShort, toJalaliMonth, formatNumber } from '../utils/formatters';
+import { ErrorState, PageHeader } from '../components/ui';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { chartColors, preset, withZoom } from '../utils/chartTheme';
+import { toJalali, toJalaliMonth, formatNumber } from '../utils/formatters';
 import { DEFAULT_TOKEN } from '../utils/tokens';
+
+const ENDPOINTS = {
+  kpis: '/refunds/kpis',
+  dailyCount: '/refunds/daily-count',
+  monthlyTrend: '/refunds/monthly-trend',
+  rateTrend: '/refunds/rate-trend',
+  candlestick: '/refunds/rate-candlestick',
+  statusDist: '/refunds/status-distribution',
+  byBank: '/refunds/by-bank',
+  amountDist: '/refunds/amount-distribution',
+};
+
+const KPI_COUNT = 9;
 
 export default function Refunds() {
   const defaults = getDefaultDateRange();
-  const [startDate, setStartDate] = useState(defaults.gregorianStart);
-  const [endDate, setEndDate] = useState(defaults.gregorianEnd);
+  const [range, setRange] = useState({
+    start_date: defaults.gregorianStart,
+    end_date: defaults.gregorianEnd,
+  });
   const [token, setToken] = useState(DEFAULT_TOKEN);
 
-  const [kpis, setKpis] = useState([]);
-  const [dailyCount, setDailyCount] = useState([]);
-  const [monthlyTrend, setMonthlyTrend] = useState([]);
-  const [rateTrend, setRateTrend] = useState([]);
-  const [rateCandlestick, setRateCandlestick] = useState([]);
-  const [statusDist, setStatusDist] = useState([]);
-  const [byBank, setByBank] = useState([]);
-  const [amountDist, setAmountDist] = useState([]);
+  /* Chart titles name the token as well, matching the KPI labels the API
+     returns — so no card on this page is ambiguous on its own. */
+  const withToken = (title) => `${title} (${token})`;
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { data, errors, loading, fatalError, refetch } = useAnalytics(ENDPOINTS, {
+    ...range,
+    token,
+  });
 
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const params = { start_date: startDate, end_date: endDate, token };
-
-      const [kpisRes, dailyRes, monthlyRes, rateRes, rateCandleRes, statusRes, bankRes, amountRes] =
-        await Promise.all([
-          client.get('/refunds/kpis', { params }),
-          client.get('/refunds/daily-count', { params }),
-          client.get('/refunds/monthly-trend', { params }),
-          client.get('/refunds/rate-trend', { params }),
-          client.get('/refunds/rate-candlestick', { params }),
-          client.get('/refunds/status-distribution', { params }),
-          client.get('/refunds/by-bank', { params }),
-          client.get('/refunds/amount-distribution', { params }),
-        ]);
-
-      setKpis(kpisRes.data.kpis);
-      setDailyCount(dailyRes.data.series);
-      setMonthlyTrend(monthlyRes.data.series);
-      setRateTrend(rateRes.data.series);
-      setRateCandlestick(rateCandleRes.data.series);
-      setStatusDist(statusRes.data.data);
-      setByBank(bankRes.data.data);
-      setAmountDist(amountRes.data.data);
-    } catch (err) {
-      console.error('Error fetching refunds data:', err);
-      if (err.response?.status === 503) {
-        setError('خطا در اتصال به پایگاه داده');
-      } else {
-        setError('خطا در دریافت اطلاعات');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [startDate, endDate, token]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const handleDateApply = (start, end) => {
-    setStartDate(start);
-    setEndDate(end);
-  };
-
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-        <p className="text-red-600 mb-4">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-        >
-          تلاش مجدد
-        </button>
-      </div>
-    );
-  }
+  const kpis = data.kpis?.kpis ?? [];
+  const dailyCount = data.dailyCount?.series ?? [];
+  const monthlyTrend = data.monthlyTrend?.series ?? [];
+  const rateTrend = data.rateTrend?.series ?? [];
+  const candlestick = data.candlestick?.series ?? [];
+  const statusDist = data.statusDist?.data ?? [];
+  const byBank = data.byBank?.data ?? [];
+  const amountDist = data.amountDist?.data ?? [];
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4 text-gray-900">بازخریدها</h2>
-      <DateFilter onApply={handleDateApply}>
+      <PageHeader title="بازخریدها" />
+
+      <DateFilter onApply={(start_date, end_date) => setRange({ start_date, end_date })}>
         <TokenFilter value={token} onChange={setToken} />
       </DateFilter>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      {/* Everything failed — almost certainly the DB or API, so say it once. */}
+      {fatalError && <ErrorState message={fatalError} onRetry={refetch} className="mb-5" />}
+
+      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {loading
-          ? Array(8)
-              .fill(0)
-              .map((_, i) => (
-                <div key={i} className="bg-white p-6 rounded-xl shadow-sm animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              ))
-          : kpis.map((kpi) => <KPICard key={kpi.key} {...kpi} />)}
+          ? Array.from({ length: KPI_COUNT }, (_, i) => <KPICardSkeleton key={i} />)
+          : kpis.map(({ key, ...kpi }) => <KPICard key={key} {...kpi} />)}
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <ChartCard
-          title="نرخ بازخرید روزانه"
+          title={withToken("نرخ بازخرید روزانه")}
           loading={loading}
-          option={{
-            grid: { left: '2%', right: '5%', containLabel: true },
-            xAxis: { type: 'category', data: rateCandlestick.map((d) => toJalali(d.date)), axisLabel: { rotate: 45 } },
-            yAxis: { type: 'value', scale: true, axisLabel: { margin: 8, formatter: (val) => val.toLocaleString('fa-IR') } },
+          error={errors.candlestick}
+          onRetry={refetch}
+          option={withZoom({
+            ...preset.candlestick({
+              name: 'نرخ بازخرید',
+              categories: candlestick.map((d) => toJalali(d.date)),
+              data: candlestick.map((d) => [d.open, d.close, d.low, d.high]),
+            }),
             tooltip: {
               trigger: 'axis',
-              axisPointer: { type: 'cross', label: { show: false } },
               formatter: (params) => {
                 const p = Array.isArray(params) ? params[0] : params;
-                if (!p || !p.value) return '';
+                if (!p?.value) return '';
                 const [, open, close, low, high] = p.value;
                 return `${p.axisValue}<br/>
-                  باز: ${formatNumber(open)}<br/>
-                  بسته: ${formatNumber(close)}<br/>
-                  کمترین: ${formatNumber(low)}<br/>
-                  بیشترین: ${formatNumber(high)}`;
+                  باز: <b>${formatNumber(open)}</b><br/>
+                  بسته: <b>${formatNumber(close)}</b><br/>
+                  کمترین: <b>${formatNumber(low)}</b><br/>
+                  بیشترین: <b>${formatNumber(high)}</b>`;
               },
             },
-            series: [
-              {
-                name: 'نرخ بازخرید',
-                type: 'candlestick',
-                data: rateCandlestick.map((d) => [d.open, d.close, d.low, d.high]),
-                itemStyle: {
-                  color: '#10b981',
-                  color0: '#ef4444',
-                  borderColor: '#10b981',
-                  borderColor0: '#ef4444',
-                },
-              },
-            ],
-          }}
+          })}
         />
+
         <ChartCard
-          title="تعداد بازخریدها در روز"
+          title={withToken("تعداد بازخریدها در روز")}
           loading={loading}
-          option={{
-            xAxis: { type: 'category', data: dailyCount.map((d) => toJalali(d.date)) },
-            yAxis: { type: 'value' },
-            series: [{ name: 'تعداد', type: 'line', data: dailyCount.map((d) => d.value), color: chartColors[4], smooth: true }],
-          }}
+          error={errors.dailyCount}
+          onRetry={refetch}
+          option={withZoom(
+            preset.line({
+              name: 'تعداد',
+              categories: dailyCount.map((d) => toJalali(d.date)),
+              data: dailyCount.map((d) => d.value),
+              color: chartColors[0],
+              area: true,
+            })
+          )}
         />
+
         <ChartCard
-          title="روند ماهانه بازخریدها"
+          title={withToken("روند ماهانه بازخریدها")}
           loading={loading}
-          option={{
-            xAxis: { type: 'category', data: monthlyTrend.map((d) => toJalaliMonth(d.date)) },
-            yAxis: { type: 'value' },
-            series: [{ name: 'تعداد', type: 'bar', data: monthlyTrend.map((d) => d.count), color: chartColors[5] }],
-          }}
+          error={errors.monthlyTrend}
+          onRetry={refetch}
+          option={preset.bar({
+            name: 'تعداد',
+            categories: monthlyTrend.map((d) => toJalaliMonth(d.date)),
+            data: monthlyTrend.map((d) => d.count),
+            color: chartColors[1],
+          })}
         />
+
         <ChartCard
-          title="توزیع وضعیت بازخریدها"
+          title={withToken("توزیع وضعیت بازخریدها")}
           loading={loading}
-          option={{
-            xAxis: { show: false },
-            yAxis: { show: false },
-            tooltip: { trigger: 'item' },
-            series: [{ type: 'pie', radius: '60%', data: statusDist.map((s) => ({ name: s.name, value: s.value })), color: chartColors, label: { fontFamily: 'Vazirmatn Variable' } }],
-          }}
+          error={errors.statusDist}
+          onRetry={refetch}
+          option={preset.pie({ name: 'وضعیت', data: statusDist })}
         />
+
         <ChartCard
-          title="توزیع بازخریدها براساس بانک"
+          title={withToken("توزیع بازخریدها براساس بانک")}
           loading={loading}
-          option={{
-            xAxis: { type: 'category', data: byBank.map((b) => b.name) },
-            yAxis: { type: 'value' },
-            series: [{ name: 'تعداد', type: 'bar', data: byBank.map((b) => b.count), color: chartColors[6] }],
-          }}
+          error={errors.byBank}
+          onRetry={refetch}
+          option={preset.bar({
+            name: 'تعداد',
+            categories: byBank.map((b) => b.name),
+            data: byBank.map((b) => b.count),
+            color: chartColors[2],
+          })}
         />
+
         <ChartCard
-          title="توزیع مقدار بازخرید"
+          title={withToken("توزیع مقدار بازخرید")}
           loading={loading}
-          option={{
-            xAxis: { type: 'category', data: amountDist.map((a) => a.name) },
-            yAxis: { type: 'value' },
-            series: [{ name: 'تعداد', type: 'bar', data: amountDist.map((a) => a.value), color: chartColors[7] }],
-          }}
+          error={errors.amountDist}
+          onRetry={refetch}
+          option={preset.bar({
+            name: 'تعداد',
+            categories: amountDist.map((a) => a.name),
+            data: amountDist.map((a) => a.value),
+            color: chartColors[3],
+          })}
         />
+
         <ChartCard
-          title="روند نرخ بازخرید"
+          title={withToken("روند نرخ بازخرید")}
           loading={loading}
-          option={{
-            xAxis: { type: 'category', data: rateTrend.map((d) => toJalali(d.date)) },
-            yAxis: { type: 'value' },
-            series: [{ name: 'نرخ میانگین', type: 'line', data: rateTrend.map((d) => d.value), color: chartColors[8], smooth: true }],
-          }}
+          error={errors.rateTrend}
+          onRetry={refetch}
+          option={withZoom(
+            preset.line({
+              name: 'نرخ میانگین',
+              categories: rateTrend.map((d) => toJalali(d.date)),
+              data: rateTrend.map((d) => d.value),
+              color: chartColors[6],
+            })
+          )}
         />
       </div>
     </div>

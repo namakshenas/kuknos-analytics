@@ -12,12 +12,24 @@ const client = axios.create({
 });
 
 /**
- * Response interceptor for error handling
+ * Response interceptor for error handling.
+ *
+ * Cancellations are skipped: filter changes deliberately abort the requests
+ * they supersede, and logging those as errors buried the real failures.
  */
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('API Error:', error?.response?.data || error.message);
+    if (!axios.isCancel(error)) {
+      // `detail` is the FastAPI error field; falling back to the raw body
+      // logged "[object Object]" and hid the actual message.
+      const detail = error?.response?.data?.detail;
+      const status = error?.response?.status;
+      console.error(
+        `API Error${status ? ` ${status}` : ''}: ${detail || error.message}`,
+        error?.config?.url ?? ''
+      );
+    }
     return Promise.reject(error);
   }
 );

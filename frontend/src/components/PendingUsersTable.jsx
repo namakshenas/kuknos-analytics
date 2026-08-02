@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Download } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import client from '../api/client';
 import { formatNumber, toPersianDigits, toJalali, toJalaliLatin } from '../utils/formatters';
+import { errorMessage } from '../hooks/useAnalytics';
+import { Badge, Button, Card, EmptyState, ErrorState, Skeleton, TextInput } from './ui';
+import { cn } from '../utils/cn';
 
 const COLUMNS = [
   { key: 'first_name', label: 'نام' },
@@ -18,6 +21,8 @@ const COLUMNS = [
   { key: 'public', label: 'کلید عمومی' },
 ];
 
+const PAGE_SIZES = [50, 100, 200];
+
 /** Columns without a free-text search box in the filter row. */
 const isFilterable = (col) => !col.numeric && !col.date;
 
@@ -29,14 +34,12 @@ const displayValue = (col, row) => {
   return toPersianDigits(value ?? '—');
 };
 
-/** Cell value written to the Excel sheet (raw numbers, Jalali dates in Latin digits). */
+/** Cell value written to the Excel sheet (raw numbers, Jalali in Latin digits). */
 const exportValue = (col, row) => {
   const value = row[col.key];
   if (col.date) return value ? toJalaliLatin(value) : '';
   return value ?? '';
 };
-
-const PAGE_SIZES = [50, 100, 200];
 
 export default function PendingUsersTable() {
   const [data, setData] = useState([]);
@@ -44,40 +47,42 @@ export default function PendingUsersTable() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [filters, setFilters] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
   const debounceRef = useRef(null);
+  const abortRef = useRef(null);
 
-  const buildFilterParams = (f) => {
-    const params = {};
-    Object.entries(f).forEach(([k, v]) => {
-      if (v) params[k] = v;
-    });
-    return params;
-  };
+  const buildFilterParams = (f) =>
+    Object.fromEntries(Object.entries(f).filter(([, v]) => v));
 
   const fetchData = useCallback(async (p, ps, f) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       setLoading(true);
       setError(null);
-      const params = { page: p, page_size: ps, ...buildFilterParams(f) };
-      const res = await client.get('/users/pending-users', { params });
+      const res = await client.get('/users/pending-users', {
+        params: { page: p, page_size: ps, ...buildFilterParams(f) },
+        signal: controller.signal,
+      });
       setData(res.data.data);
       setTotal(res.data.total);
     } catch (err) {
-      console.error('Error fetching pending users:', err);
-      setError(err.response?.status === 503
-        ? 'خطا در اتصال به پایگاه داده'
-        : 'خطا در دریافت اطلاعات');
+      const message = errorMessage(err);
+      if (message) setError(message); // null means aborted — keep the old view
+      else return;
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchData(page, pageSize, filters);
-  }, [page, pageSize, fetchData]);
+    return () => abortRef.current?.abort();
+  }, [page, pageSize, fetchData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFilterChange = (key, value) => {
     const next = { ...filters, [key]: value };
@@ -92,170 +97,194 @@ export default function PendingUsersTable() {
   const handleExport = async () => {
     try {
       setExporting(true);
-      const params = buildFilterParams(filters);
-      const res = await client.get('/users/pending-users/export', { params });
+      const res = await client.get('/users/pending-users/export', {
+        params: buildFilterParams(filters),
+      });
       const rows = res.data.data;
 
       const header = COLUMNS.map((c) => c.label);
       const body = rows.map((row) => COLUMNS.map((col) => exportValue(col, row)));
 
       const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
-
-      // Set column widths
-      ws['!cols'] = COLUMNS.map((col) =>
-        col.numeric ? { wch: 18 } : { wch: 22 }
-      );
+      ws['!cols'] = COLUMNS.map((col) => (col.numeric ? { wch: 18 } : { wch: 22 }));
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'بازخرید معلق');
       XLSX.writeFile(wb, 'pending_refunds.xlsx', { bookType: 'xlsx' });
     } catch (err) {
       console.error('Export failed:', err);
+      setError('خطا در تهیه خروجی اکسل');
     } finally {
       setExporting(false);
     }
   };
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
   const goTo = (p) => {
     if (p >= 1 && p <= totalPages) setPage(p);
   };
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-6 mt-8 mx-1">
-        <p className="text-red-600 mb-3">{error}</p>
-        <button
-          onClick={() => fetchData(page, pageSize, filters)}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-        >
-          تلاش مجدد
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white rounded-xl shadow-sm mt-8 mx-1 overflow-hidden border border-gray-100">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h3 className="text-lg font-semibold text-gray-800">کاربران با بازخرید معلق</h3>
-          <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
-            {toPersianDigits(total)} نتیجه
-          </span>
+    <Card padding="none" className="mt-5 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-content">کاربران با بازخرید معلق</h3>
+          <Badge>{toPersianDigits(total)} نتیجه</Badge>
         </div>
-        <button
+        <Button
+          variant="success"
+          size="sm"
+          icon={Download}
           onClick={handleExport}
-          disabled={exporting || total === 0}
-          className="flex items-center gap-2 px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          loading={exporting}
+          disabled={total === 0}
         >
-          <Download size={15} />
-          {exporting ? 'در حال خروجی...' : 'خروجی اکسل'}
-        </button>
+          {exporting ? 'در حال تهیه خروجی…' : 'خروجی اکسل'}
+        </Button>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto scrollbar-thin">
-        <table className="w-full text-sm" style={{ minWidth: '1320px' }}>
-          <thead>
-            <tr className="bg-gray-50 text-gray-600">
-              {COLUMNS.map((col) => (
-                <th key={col.key} className="px-4 py-3 text-right font-medium whitespace-nowrap">
-                  {col.label}
-                </th>
-              ))}
-            </tr>
-            <tr className="bg-gray-50/50 border-b border-gray-200">
-              {COLUMNS.map((col) => (
-                <th key={`f-${col.key}`} className="px-4 pb-2.5">
-                  {isFilterable(col) ? (
-                    <input
-                      type="text"
-                      placeholder="جستجو..."
-                      value={filters[col.key] || ''}
-                      onChange={(e) => handleFilterChange(col.key, e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 bg-white"
-                    />
-                  ) : (
-                    <div className="h-7" />
+      {error ? (
+        <ErrorState
+          message={error}
+          onRetry={() => fetchData(page, pageSize, filters)}
+          className="m-4 border-0 shadow-none"
+        />
+      ) : (
+        <>
+          {/* Plain scroll container. A fade-out mask on the overflowing edge
+              was tried and dropped: in a table it dims real values, which is a
+              worse trade than simply showing the scrollbar. */}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[68rem] text-sm">
+              <caption className="sr-only">
+                فهرست کاربران با بازخرید پرداخت‌نشده، همراه با مقدار، مبلغ و تاریخ درخواست
+              </caption>
+              <thead>
+                {/* sticky so the header stays put while scanning long pages */}
+                <tr className="sticky top-0 z-10 bg-surface-muted text-content-muted">
+                  {COLUMNS.map((col) => (
+                    <th
+                      key={col.key}
+                      scope="col"
+                      className="whitespace-nowrap px-3 py-2.5 text-start font-medium"
+                    >
+                      {col.label}
+                    </th>
+                  ))}
+                </tr>
+                <tr className="border-b border-border bg-surface-muted">
+                  {COLUMNS.map((col) => (
+                    <th key={`f-${col.key}`} scope="col" className="px-3 pb-2.5">
+                      {isFilterable(col) ? (
+                        <TextInput
+                          size="sm"
+                          placeholder="جستجو…"
+                          aria-label={`جستجو در ${col.label}`}
+                          value={filters[col.key] || ''}
+                          onChange={(e) => handleFilterChange(col.key, e.target.value)}
+                        />
+                      ) : (
+                        <div className="h-8" />
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {loading ? (
+                  Array.from({ length: 6 }, (_, i) => (
+                    <tr key={i}>
+                      {COLUMNS.map((col) => (
+                        <td key={col.key} className="h-row px-3">
+                          <Skeleton className="h-4" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : data.length === 0 ? (
+                  <tr>
+                    <td colSpan={COLUMNS.length}>
+                      <EmptyState
+                        message="داده‌ای یافت نشد"
+                        hint="عبارت جستجو را تغییر دهید"
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  data.map((row, idx) => (
+                    <tr
+                      key={idx}
+                      className="transition-colors duration-fast hover:bg-surface-hover"
+                    >
+                      {COLUMNS.map((col) => (
+                        <td
+                          key={col.key}
+                          className={cn(
+                            'h-row whitespace-nowrap px-3 text-content-muted',
+                            col.numeric && 'font-medium text-content'
+                          )}
+                        >
+                          {displayValue(col, row)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm">
+            <div className="flex items-center gap-1.5">
+              <span className="text-content-muted">تعداد در صفحه:</span>
+              {PAGE_SIZES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => {
+                    setPageSize(s);
+                    setPage(1);
+                  }}
+                  aria-pressed={pageSize === s}
+                  className={cn(
+                    'min-w-9 rounded-md px-2 py-1 transition-colors duration-fast',
+                    pageSize === s
+                      ? 'bg-primary text-primary-fg font-medium'
+                      : 'bg-surface-hover text-content-muted hover:bg-border'
                   )}
-                </th>
+                >
+                  {toPersianDigits(s)}
+                </button>
               ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>
-                  {COLUMNS.map((col) => (
-                    <td key={col.key} className="px-4 py-3.5">
-                      <div className="h-4 bg-gray-100 rounded animate-pulse" />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : data.length === 0 ? (
-              <tr>
-                <td colSpan={COLUMNS.length} className="text-center py-12 text-gray-400">
-                  داده‌ای یافت نشد
-                </td>
-              </tr>
-            ) : (
-              data.map((row, idx) => (
-                <tr key={idx} className="hover:bg-gray-50/60 transition-colors">
-                  {COLUMNS.map((col) => (
-                    <td key={col.key} className="px-4 py-3 whitespace-nowrap text-gray-700">
-                      {displayValue(col, row)}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+            </div>
 
-      {/* Pagination */}
-      <div className="px-6 py-3.5 border-t border-gray-100 flex items-center justify-between text-sm">
-        <div className="flex items-center gap-2 text-gray-600">
-          <span>تعداد در صفحه:</span>
-          {PAGE_SIZES.map((s) => (
-            <button
-              key={s}
-              onClick={() => { setPageSize(s); setPage(1); }}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
-                pageSize === s
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {toPersianDigits(s)}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => goTo(page - 1)}
-            disabled={page <= 1}
-            className="px-3 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            قبلی
-          </button>
-          <span className="px-3 py-1 text-gray-600">
-            {toPersianDigits(page)} / {toPersianDigits(totalPages)}
-          </span>
-          <button
-            onClick={() => goTo(page + 1)}
-            disabled={page >= totalPages}
-            className="px-3 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            بعدی
-          </button>
-        </div>
-      </div>
-    </div>
+            <div className="flex items-center gap-1.5">
+              {/* RTL: "previous" points to the right, "next" to the left. */}
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={ChevronRight}
+                onClick={() => goTo(page - 1)}
+                disabled={page <= 1}
+              >
+                قبلی
+              </Button>
+              <span className="px-2 text-content-muted">
+                {toPersianDigits(page)} از {toPersianDigits(totalPages)}
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => goTo(page + 1)}
+                disabled={page >= totalPages}
+              >
+                بعدی
+                <ChevronLeft size={16} aria-hidden="true" />
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
+    </Card>
   );
 }

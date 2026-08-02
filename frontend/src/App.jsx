@@ -1,35 +1,37 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Buys from './pages/Buys';
 import Refunds from './pages/Refunds';
 import UserAnalytics from './pages/UserAnalytics';
-import PlaceholderA from './pages/PlaceholderA';
-import PlaceholderB from './pages/PlaceholderB';
-import PlaceholderC from './pages/PlaceholderC';
+import ComingSoon from './pages/ComingSoon';
+import { navItems } from './config/navigation';
 
-/**
- * Main App component with routing
- */
+const PAGES = {
+  refunds: Refunds,
+  buys: Buys,
+  users: UserAnalytics,
+};
+
 export default function App() {
   return (
     <BrowserRouter>
       <Layout>
         <Routes>
-          {/* Default route redirects to refunds */}
           <Route path="/" element={<Navigate to="/refunds" replace />} />
 
-          {/* Main pages */}
-          <Route path="/refunds" element={<Refunds />} />
-          <Route path="/buys" element={<Buys />} />
-          <Route path="/users" element={<UserAnalytics />} />
+          {/* Routes are generated from the same config the sidebar reads, so a
+              section's title always matches the item that was clicked. */}
+          {navItems.map(({ key, path, label }) => {
+            const Page = PAGES[key];
+            return (
+              <Route
+                key={key}
+                path={path}
+                element={Page ? <Page /> : <ComingSoon title={label} />}
+              />
+            );
+          })}
 
-          {/* Placeholder pages */}
-          <Route path="/section-a" element={<PlaceholderA />} />
-          <Route path="/section-b" element={<PlaceholderB />} />
-          <Route path="/section-c" element={<PlaceholderC />} />
-
-          {/* 404 fallback */}
           <Route path="*" element={<Navigate to="/refunds" replace />} />
         </Routes>
       </Layout>

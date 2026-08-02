@@ -8,6 +8,11 @@ from app.services.token_utils import DEFAULT_TOKEN, FEE_PRICE_SERIES
 import numpy as np
 
 
+def buys_fee_label(token: str) -> str:
+    """Shared so the lazy placeholder and the resolved value agree."""
+    return f"مجموع کارمزد خرید ({token})"
+
+
 async def get_kpis(
     session: AsyncSession,
     start_date: Optional[str] = None,
@@ -48,21 +53,25 @@ async def get_kpis(
         )
         unique_buyers = result.scalar() or 0
 
+        # Every label carries the selected token, so a card is never ambiguous
+        # once it has been read out of context (or exported / screenshotted).
         kpis = [
-            {"key": "total_buys", "label": "تعداد کل خریدها", "value": int(total_buys), "format": "number"},
-            {"key": "total_volume", "label": f"حجم کل {token}", "value": float(total_volume), "format": "number"},
-            {"key": "total_revenue", "label": "مجموع ریالی", "value": int(total_revenue), "format": "rial"},
-            {"key": "avg_amount", "label": "میانگین مقدار خرید", "value": float(avg_amount), "format": "decimal"},
+            {"key": "total_buys", "label": f"تعداد کل خریدها ({token})", "value": int(total_buys), "format": "number"},
+            {"key": "total_volume", "label": f"حجم کل خریداری شده ({token})", "value": float(total_volume), "format": "number"},
+            {"key": "total_revenue", "label": f"مجموع ریالی خریدها ({token})", "value": int(total_revenue), "format": "rial"},
+            {"key": "avg_amount", "label": f"میانگین مقدار خرید ({token})", "value": float(avg_amount), "format": "decimal"},
         ]
 
-        # The fee formula depends on a token-specific price series; only PMN has one.
+        # The fee formula depends on a token-specific price series; only PMN has
+        # one. The label must match get_total_buys_fee's exactly, or it would
+        # visibly change when the lazily-loaded value patches the card.
         if token in FEE_PRICE_SERIES:
             kpis.append(
-                {"key": "total_buys_fee", "label": "مجموع کارمزد", "value": None, "format": "rial", "lazy": True}
+                {"key": "total_buys_fee", "label": buys_fee_label(token), "value": None, "format": "rial", "lazy": True}
             )
 
         kpis.append(
-            {"key": "unique_buyers", "label": "تعداد خریداران منحصر به فرد", "value": int(unique_buyers), "format": "number"}
+            {"key": "unique_buyers", "label": f"تعداد خریداران منحصر به فرد ({token})", "value": int(unique_buyers), "format": "number"}
         )
 
         return {"kpis": kpis}
@@ -405,7 +414,7 @@ async def get_total_buys_fee(
             total_buys_fee = int(np.sum(tx_amounts * fee_per_token))
 
         return {
-            "kpi": {"key": "total_buys_fee", "label": "مجموع کارمزد", "value": int(total_buys_fee), "format": "rial"}
+            "kpi": {"key": "total_buys_fee", "label": buys_fee_label(token), "value": int(total_buys_fee), "format": "rial"}
         }
 
     except HTTPException:

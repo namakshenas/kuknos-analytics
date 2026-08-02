@@ -62,17 +62,19 @@ async def get_kpis(
         )
         unique_sellers = result.scalar() or 0
 
+        # Every label carries the selected token, so a card is never ambiguous
+        # once it has been read out of context (or exported / screenshotted).
         return {
             "kpis": [
-                {"key": "total_completed", "label": "تعداد بازخریدهای تکمیل شده", "value": int(total_completed), "format": "number"},
-                {"key": "total_pending", "label": "تعداد بازخریدهای در انتظار", "value": int(total_pending), "format": "number"},
-                {"key": "total_num_pmn_pending", "label": f"حجم کل {token} در انتظار بازخرید", "value": int(total_num_pending), "format": "number"},
-                {"key": "pending_amount", "label": "مجموع بازخریدهای در انتظار", "value": int(pending_amount), "format": "rial"},
-                {"key": "total_sold", "label": f"حجم کل {token} بازخرید شده", "value": float(total_sold), "format": "number"},
-                {"key": "total_payout", "label": "مجموع بازخرید (ریال)", "value": int(total_payout), "format": "rial"},
-                {"key": "total_fees", "label": "مجموع کارمزد", "value": int(total_fees), "format": "rial"},
-                {"key": "avg_amount", "label": "میانگین مقدار بازخرید", "value": float(avg_amount), "format": "decimal"},
-                {"key": "unique_sellers", "label": "تعداد بازخریدکنندگان منحصر به فرد", "value": int(unique_sellers), "format": "number"},
+                {"key": "total_completed", "label": f"تعداد بازخریدهای تکمیل شده ({token})", "value": int(total_completed), "format": "number"},
+                {"key": "total_pending", "label": f"تعداد بازخریدهای در انتظار ({token})", "value": int(total_pending), "format": "number"},
+                {"key": "total_num_pmn_pending", "label": f"حجم کل در انتظار بازخرید ({token})", "value": int(total_num_pending), "format": "number"},
+                {"key": "pending_amount", "label": f"مجموع ریالی بازخریدهای در انتظار ({token})", "value": int(pending_amount), "format": "rial"},
+                {"key": "total_sold", "label": f"حجم کل بازخرید شده ({token})", "value": float(total_sold), "format": "number"},
+                {"key": "total_payout", "label": f"مجموع بازخرید به ریال ({token})", "value": int(total_payout), "format": "rial"},
+                {"key": "total_fees", "label": f"مجموع کارمزد ({token})", "value": int(total_fees), "format": "rial"},
+                {"key": "avg_amount", "label": f"میانگین مقدار بازخرید ({token})", "value": float(avg_amount), "format": "decimal"},
+                {"key": "unique_sellers", "label": f"تعداد بازخریدکنندگان منحصر به فرد ({token})", "value": int(unique_sellers), "format": "number"},
             ]
         }
 

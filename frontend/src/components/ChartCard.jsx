@@ -1,75 +1,109 @@
-import React from 'react';
+import { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
-import { persianChartDefaults } from '../utils/chartDefaults';
+import { BarChart3 } from 'lucide-react';
+import { baseOption } from '../utils/chartTheme';
+import { Card, Skeleton, EmptyState, ErrorState } from './ui';
 
 /**
- * Chart Card component - wrapper around ECharts with loading and error states
+ * Recursive merge for ECharts options.
+ *
+ * The previous implementation hand-spread exactly five keys
+ * (textStyle/tooltip/grid/xAxis/yAxis) which meant `series`, `legend`,
+ * `color`, `dataZoom` and `aria` could never carry a default, an array-form
+ * `xAxis` was silently corrupted into an object, and a missing `option`
+ * threw. Arrays replace wholesale here — element-wise merging is wrong for
+ * `series` and for multi-axis charts.
  */
-export default function ChartCard({ title, option, loading, error }) {
+function mergeOption(base, override) {
+  if (!override) return base;
+  const out = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    if (value === undefined) continue;
+    const prev = out[key];
+    const bothPlainObjects =
+      prev && value &&
+      typeof prev === 'object' && typeof value === 'object' &&
+      !Array.isArray(prev) && !Array.isArray(value);
+    out[key] = bothPlainObjects ? mergeOption(prev, value) : value;
+  }
+  return out;
+}
+
+/** True when every series is present but empty — a blank chart frame. */
+function hasNoData(option) {
+  const series = option?.series;
+  if (!Array.isArray(series) || series.length === 0) return false;
+  return series.every((s) => Array.isArray(s?.data) && s.data.length === 0);
+}
+
+export default function ChartCard({
+  title,
+  option,
+  loading,
+  error,
+  onRetry,
+  height = 300,
+  footer,
+}) {
+  const merged = useMemo(
+    () => (option ? mergeOption(baseOption(), option) : null),
+    [option]
+  );
+
+  // The title renders in every state, so the heading never pops in late and
+  // the card's height is identical throughout (skill rule `content-jumping`).
+  const header = <h3 className="mb-3 text-base font-semibold text-content">{title}</h3>;
+
   if (loading) {
     return (
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-64 bg-gray-100 rounded"></div>
-        </div>
-      </div>
+      <Card>
+        {header}
+        <Skeleton className="w-full" style={{ height }} />
+      </Card>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-red-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-red-600">خطا در بارگذاری نمودار</p>
+      <Card>
+        {header}
+        <div className="flex items-center" style={{ height }}>
+          <ErrorState
+            message="خطا در بارگذاری نمودار"
+            onRetry={onRetry}
+            className="w-full border-0 bg-transparent shadow-none"
+          />
         </div>
-      </div>
+      </Card>
     );
   }
 
-  // Deep merge Persian defaults with provided options
-  const mergedOption = {
-    ...persianChartDefaults,
-    ...option,
-    textStyle: {
-      ...persianChartDefaults.textStyle,
-      ...option.textStyle,
-    },
-    tooltip: {
-      ...persianChartDefaults.tooltip,
-      ...option.tooltip,
-    },
-    grid: {
-      ...persianChartDefaults.grid,
-      ...option.grid,
-    },
-    xAxis: option.xAxis ? {
-      ...persianChartDefaults.xAxis,
-      ...option.xAxis,
-      axisLabel: {
-        ...persianChartDefaults.xAxis?.axisLabel,
-        ...option.xAxis?.axisLabel,
-      }
-    } : persianChartDefaults.xAxis,
-    yAxis: option.yAxis ? {
-      ...persianChartDefaults.yAxis,
-      ...option.yAxis,
-      axisLabel: {
-        ...persianChartDefaults.yAxis?.axisLabel,
-        ...option.yAxis?.axisLabel,
-      }
-    } : persianChartDefaults.yAxis,
-  };
+  if (!merged || hasNoData(merged)) {
+    return (
+      <Card>
+        {header}
+        <div className="flex items-center justify-center" style={{ height }}>
+          <EmptyState
+            icon={BarChart3}
+            message="داده‌ای برای این بازه وجود ندارد"
+            hint="بازه زمانی یا توکن دیگری را انتخاب کنید"
+            className="py-0"
+          />
+        </div>
+      </Card>
+    );
+  }
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
+    <Card>
+      {header}
       <ReactECharts
-        option={mergedOption}
-        style={{ height: '300px' }}
+        option={merged}
+        style={{ height }}
         opts={{ renderer: 'svg' }}
+        notMerge
       />
-    </div>
+      {footer && <div className="mt-2 text-xs text-content-subtle">{footer}</div>}
+    </Card>
   );
 }

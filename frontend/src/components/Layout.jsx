@@ -1,36 +1,82 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
 import DbStatus from './DbStatus';
 
-/**
- * Layout component - defines the overall RTL structure with header and sidebar
- */
+const COLLAPSE_KEY = 'kuknos.sidebar.collapsed';
+
+/** Collapse state survives reloads and navigation — it used to reset every time. */
+function useStoredCollapse() {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(COLLAPSE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
+    } catch {
+      /* private mode / storage disabled — a non-persisted sidebar is fine */
+    }
+  }, [collapsed]);
+
+  return [collapsed, setCollapsed];
+}
+
 export default function Layout({ children }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useStoredCollapse();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Escape closes the drawer (skill rule `modal-escape`). Navigation closes it
+  // via each link's own onClick, so no route-watching effect is needed.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e) => e.key === 'Escape' && setMobileOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileOpen]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10 shadow-sm flex items-center gap-3">
-        <img src="/kuknos_co_logo.jpeg" alt="ققنوس" className="h-8 w-8 object-contain" />
-        <h1 className="text-2xl font-bold text-gray-900">ققنوس آنالتیکس</h1>
-        <div className="mr-auto">
+    <div className="min-h-dvh bg-bg">
+      <header className="sticky top-0 z-50 flex h-header items-center gap-3 border-b border-border bg-surface px-4 sm:px-5">
+        <button
+          type="button"
+          onClick={() => setMobileOpen((v) => !v)}
+          aria-label="نمایش منو"
+          aria-expanded={mobileOpen}
+          className="-ms-2 rounded-lg p-2 text-content-muted transition-colors duration-fast hover:bg-surface-hover lg:hidden"
+        >
+          <Menu size={20} aria-hidden="true" />
+        </button>
+
+        <img
+          src="/kuknos_co_logo.jpeg"
+          alt=""
+          width="28"
+          height="28"
+          className="h-7 w-7 shrink-0 rounded-md object-contain"
+        />
+        <h1 className="truncate text-lg font-bold text-content">ققنوس آنالیتیکس</h1>
+
+        <div className="ms-auto">
           <DbStatus />
         </div>
       </header>
 
-      {/* Main container with sidebar and content */}
-      <div className="flex">
-        {/* Sidebar (on the right in RTL) */}
+      <div className="flex items-start">
         <Sidebar
-          collapsed={sidebarCollapsed}
-          toggleCollapsed={() => setSidebarCollapsed(!sidebarCollapsed)}
+          collapsed={collapsed}
+          toggleCollapsed={() => setCollapsed((v) => !v)}
+          mobileOpen={mobileOpen}
+          closeMobile={() => setMobileOpen(false)}
         />
 
-        {/* Main content area (on the left in RTL) */}
-        <main className="flex-1 p-6 overflow-x-hidden">
-          {children}
-        </main>
+        {/* min-w-0 lets the wide pending-refunds table scroll inside the grid
+            instead of stretching the page (skill rule `horizontal-scroll`). */}
+        <main className="min-w-0 flex-1 p-4 sm:p-5">{children}</main>
       </div>
     </div>
   );
