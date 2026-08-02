@@ -75,6 +75,7 @@ async def get_buy_sell_comparison(
 async def get_pending_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    token: Optional[str] = Query(None),
     public: Optional[str] = Query(None),
     national_id: Optional[str] = Query(None),
     first_name: Optional[str] = Query(None),
@@ -86,6 +87,7 @@ async def get_pending_users(
 ):
     filters = {}
     for key, val in [
+        ("token", token),
         ("public", public),
         ("national_id", national_id),
         ("first_name", first_name),
@@ -101,6 +103,7 @@ async def get_pending_users(
 
 @router.get("/pending-users/export")
 async def export_pending_users(
+    token: Optional[str] = Query(None),
     public: Optional[str] = Query(None),
     national_id: Optional[str] = Query(None),
     first_name: Optional[str] = Query(None),
@@ -112,6 +115,7 @@ async def export_pending_users(
 ):
     filters = {}
     for key, val in [
+        ("token", token),
         ("public", public),
         ("national_id", national_id),
         ("first_name", first_name),

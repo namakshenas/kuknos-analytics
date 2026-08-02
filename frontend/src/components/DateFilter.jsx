@@ -27,7 +27,7 @@ export function getDefaultDateRange() {
   };
 }
 
-export default function DateFilter({ onApply }) {
+export default function DateFilter({ onApply, children }) {
   const defaults = getCurrentJalaliMonth();
   const [startDate, setStartDate] = useState(defaults.start);
   const [endDate, setEndDate] = useState(defaults.end);
@@ -43,6 +43,7 @@ export default function DateFilter({ onApply }) {
   return (
     <>
     <div className="flex items-center gap-3 mb-4 flex-wrap">
+      {children}
       <label className="text-sm text-gray-600">از:</label>
       <DatePicker
         value={startDate}

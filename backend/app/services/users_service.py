@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from app.logger import logger
 from typing import Dict, List, Optional
 from app.services.date_utils import build_date_filter
+from app.services.token_utils import SUPPORTED_TOKENS
 
 
 async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
@@ -239,6 +240,7 @@ async def get_buy_sell_comparison(session: AsyncSession, start_date: Optional[st
 
 
 PENDING_USERS_FILTERABLE_COLUMNS = {
+    "token": "pr.code",
     "public": "pr.public",
     "national_id": "i.national_id",
     "first_name": "i.first_name",
@@ -250,6 +252,7 @@ PENDING_USERS_FILTERABLE_COLUMNS = {
 
 PENDING_USERS_SELECT = """
     SELECT
+        pr.code AS token,
         pr.public,
         i.national_id,
         i.first_name,
@@ -258,22 +261,27 @@ PENDING_USERS_SELECT = """
         i.cardnumber,
         ku.mobile,
         pr.refund_price,
-        pr.amount
+        pr.amount,
+        pr.updated_at
 """
 
-PENDING_USERS_FROM = """
+# The pending table spans every token exposed in the dropdowns, so each row reports its own code.
+_PENDING_TOKEN_BINDS = ", ".join(f":pending_token_{i}" for i in range(len(SUPPORTED_TOKENS)))
+_PENDING_TOKEN_PARAMS = {f"pending_token_{i}": t for i, t in enumerate(SUPPORTED_TOKENS)}
+
+PENDING_USERS_FROM = f"""
     FROM pending_refunds pr
     JOIN federation f ON f.public = pr.public
     JOIN kuknos_user ku ON ku.id = f.user_id
     JOIN identity i ON i.national_id = ku.national_id
     WHERE pr.status = '1'
-      AND pr.code = 'PMN'
+      AND pr.code IN ({_PENDING_TOKEN_BINDS})
 """
 
 
 def _build_pending_filters(filters: Optional[Dict[str, str]]):
     where_clauses: List[str] = []
-    params: Dict = {}
+    params: Dict = dict(_PENDING_TOKEN_PARAMS)
     if filters:
         for key, value in filters.items():
             if value and key in PENDING_USERS_FILTERABLE_COLUMNS:
@@ -289,6 +297,7 @@ def _build_pending_filters(filters: Optional[Dict[str, str]]):
 
 def _row_to_dict(row):
     return {
+        "token": row.token,
         "public": row.public,
         "national_id": row.national_id,
         "first_name": row.first_name,
@@ -298,6 +307,7 @@ def _row_to_dict(row):
         "mobile": row.mobile,
         "refund_price": float(row.refund_price) if row.refund_price else None,
         "amount": float(row.amount) if row.amount else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
     }
 
 

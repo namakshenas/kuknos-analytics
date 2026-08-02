@@ -104,6 +104,7 @@ class CandlestickResponse(BaseModel):
 class PendingUserItem(BaseModel):
     """A user with pending (unpaid) refund"""
 
+    token: Optional[str] = None
     public: Optional[str] = None
     national_id: Optional[str] = None
     first_name: Optional[str] = None
@@ -113,6 +114,7 @@ class PendingUserItem(BaseModel):
     mobile: Optional[str] = None
     refund_price: Optional[float] = None
     amount: Optional[float] = None
+    updated_at: Optional[str] = None
 
 
 class PendingUsersResponse(BaseModel):

@@ -4,69 +4,90 @@ from fastapi import HTTPException
 from app.logger import logger
 from typing import Dict, Optional
 from app.services.date_utils import build_date_filter
+from app.services.token_utils import DEFAULT_TOKEN, FEE_PRICE_SERIES
 import numpy as np
 
 
-async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_kpis(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         result = await session.execute(
-            text(f"SELECT COUNT(*) AS total_successful_buys FROM pending_txes WHERE status = '0' AND code = 'PMN'{df}"),
+            text(f"SELECT COUNT(*) AS total_successful_buys FROM pending_txes WHERE status = '0' AND code = :token{df}"),
             params,
         )
         total_buys = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COALESCE(SUM(amount), 0) AS total_pmn_bought FROM pending_txes WHERE status = '0' AND code = 'PMN'{df}"),
+            text(f"SELECT COALESCE(SUM(amount), 0) AS total_bought FROM pending_txes WHERE status = '0' AND code = :token{df}"),
             params,
         )
         total_volume = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COALESCE(SUM(price), 0) AS total_revenue_rials FROM pending_txes WHERE status = '0' AND code = 'PMN'{df}"),
+            text(f"SELECT COALESCE(SUM(price), 0) AS total_revenue_rials FROM pending_txes WHERE status = '0' AND code = :token{df}"),
             params,
         )
         total_revenue = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COALESCE(AVG(amount), 0) AS avg_purchase_amount FROM pending_txes WHERE status = '0' AND code = 'PMN'{df}"),
+            text(f"SELECT COALESCE(AVG(amount), 0) AS avg_purchase_amount FROM pending_txes WHERE status = '0' AND code = :token{df}"),
             params,
         )
         avg_amount = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COUNT(DISTINCT public_key) AS unique_buyers FROM pending_txes WHERE status = '0' AND code = 'PMN'{df}"),
+            text(f"SELECT COUNT(DISTINCT public_key) AS unique_buyers FROM pending_txes WHERE status = '0' AND code = :token{df}"),
             params,
         )
         unique_buyers = result.scalar() or 0
 
-        return {
-            "kpis": [
-                {"key": "total_buys", "label": "تعداد کل خریدها", "value": int(total_buys), "format": "number"},
-                {"key": "total_volume", "label": "حجم کل PMN", "value": float(total_volume), "format": "number"},
-                {"key": "total_revenue", "label": "مجموع ریالی", "value": int(total_revenue), "format": "rial"},
-                {"key": "avg_amount", "label": "میانگین مقدار خرید", "value": float(avg_amount), "format": "decimal"},
-                {"key": "total_buys_fee", "label": "مجموع کارمزد", "value": None, "format": "rial", "lazy": True},
-                {"key": "unique_buyers", "label": "تعداد خریداران منحصر به فرد", "value": int(unique_buyers), "format": "number"},
-            ]
-        }
+        kpis = [
+            {"key": "total_buys", "label": "تعداد کل خریدها", "value": int(total_buys), "format": "number"},
+            {"key": "total_volume", "label": f"حجم کل {token}", "value": float(total_volume), "format": "number"},
+            {"key": "total_revenue", "label": "مجموع ریالی", "value": int(total_revenue), "format": "rial"},
+            {"key": "avg_amount", "label": "میانگین مقدار خرید", "value": float(avg_amount), "format": "decimal"},
+        ]
+
+        # The fee formula depends on a token-specific price series; only PMN has one.
+        if token in FEE_PRICE_SERIES:
+            kpis.append(
+                {"key": "total_buys_fee", "label": "مجموع کارمزد", "value": None, "format": "rial", "lazy": True}
+            )
+
+        kpis.append(
+            {"key": "unique_buyers", "label": "تعداد خریداران منحصر به فرد", "value": int(unique_buyers), "format": "number"}
+        )
+
+        return {"kpis": kpis}
 
     except Exception as e:
         logger.error(f"Database error in buys_service.get_kpis: {e}")
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_daily_count(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_daily_count(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
         time_filter = df if df else " AND created_at >= NOW() - INTERVAL '12 months'"
 
         result = await session.execute(
             text(f"""
                 SELECT DATE(created_at) AS day, COALESCE(SUM(amount), 0) AS total_amount
                 FROM pending_txes
-                WHERE status = '0' AND code = 'PMN'{time_filter}
+                WHERE status = '0' AND code = :token{time_filter}
                 GROUP BY DATE(created_at)
                 ORDER BY day
             """),
@@ -83,16 +104,22 @@ async def get_daily_count(session: AsyncSession, start_date: Optional[str] = Non
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_daily_volume(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_daily_volume(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
         time_filter = df if df else " AND created_at >= NOW() - INTERVAL '12 months'"
 
         result = await session.execute(
             text(f"""
                 SELECT DATE(created_at) AS day, COALESCE(SUM(price), 0) AS total_rials
                 FROM pending_txes
-                WHERE status = '0' AND code = 'PMN'{time_filter}
+                WHERE status = '0' AND code = :token{time_filter}
                 GROUP BY DATE(created_at)
                 ORDER BY day
             """),
@@ -109,9 +136,15 @@ async def get_daily_volume(session: AsyncSession, start_date: Optional[str] = No
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_monthly_trend(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_monthly_trend(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         result = await session.execute(
             text(f"""
@@ -121,7 +154,7 @@ async def get_monthly_trend(session: AsyncSession, start_date: Optional[str] = N
                     COALESCE(SUM(amount), 0) AS total_amount,
                     COALESCE(SUM(price), 0) AS total_rials
                 FROM pending_txes
-                WHERE status = '0' AND code = 'PMN'{df}
+                WHERE status = '0' AND code = :token{df}
                 GROUP BY DATE_TRUNC('month', created_at)
                 ORDER BY month
             """),
@@ -147,16 +180,22 @@ async def get_monthly_trend(session: AsyncSession, start_date: Optional[str] = N
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_exchange_rate_trend(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_exchange_rate_trend(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
         time_filter = df if df else " AND created_at >= NOW() - INTERVAL '12 months'"
 
         result = await session.execute(
             text(f"""
                 SELECT DATE(created_at) AS day, AVG(exchange_rate) AS avg_rate
                 FROM pending_txes
-                WHERE status = '0' AND code = 'PMN' AND exchange_rate > 0{time_filter}
+                WHERE status = '0' AND code = :token AND exchange_rate > 0{time_filter}
                 GROUP BY DATE(created_at)
                 ORDER BY day
             """),
@@ -173,15 +212,21 @@ async def get_exchange_rate_trend(session: AsyncSession, start_date: Optional[st
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_by_gateway(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_by_gateway(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         result = await session.execute(
             text(f"""
                 SELECT gateway, COUNT(*) AS count, SUM(price) AS total_rials
                 FROM pending_txes
-                WHERE status = '0' AND code = 'PMN' AND gateway IS NOT NULL AND gateway != ''{df}
+                WHERE status = '0' AND code = :token AND gateway IS NOT NULL AND gateway != ''{df}
                 GROUP BY gateway
                 ORDER BY count DESC
             """),
@@ -201,15 +246,21 @@ async def get_by_gateway(session: AsyncSession, start_date: Optional[str] = None
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_by_application(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_by_application(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         result = await session.execute(
             text(f"""
                 SELECT application, COUNT(*) AS count
                 FROM pending_txes
-                WHERE status = '0' AND code = 'PMN' AND application IS NOT NULL{df}
+                WHERE status = '0' AND code = :token AND application IS NOT NULL{df}
                 GROUP BY application
                 ORDER BY count DESC
             """),
@@ -226,15 +277,21 @@ async def get_by_application(session: AsyncSession, start_date: Optional[str] = 
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_status_distribution(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_status_distribution(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         result = await session.execute(
             text(f"""
                 SELECT status, COUNT(*) AS count
                 FROM pending_txes
-                WHERE code = 'PMN'{df}
+                WHERE code = :token{df}
                 GROUP BY status
                 ORDER BY count DESC
             """),
@@ -251,9 +308,15 @@ async def get_status_distribution(session: AsyncSession, start_date: Optional[st
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_amount_distribution(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_amount_distribution(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         result = await session.execute(
             text(f"""
@@ -267,7 +330,7 @@ async def get_amount_distribution(session: AsyncSession, start_date: Optional[st
                     END AS bucket,
                     COUNT(*) AS count
                 FROM pending_txes
-                WHERE status = '0' AND code = 'PMN'{df}
+                WHERE status = '0' AND code = :token{df}
                 GROUP BY bucket
                 ORDER BY MIN(amount)
             """),
@@ -284,16 +347,26 @@ async def get_amount_distribution(session: AsyncSession, start_date: Optional[st
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_total_buys_fee(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
-    """Expensive KPI: calculates total buy fees using ND prices from market_parameters_minutes."""
+async def get_total_buys_fee(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
+    """Expensive KPI: calculates total buy fees using the token's price series in market_parameters_minutes."""
+    price_series = FEE_PRICE_SERIES.get(token)
+    if price_series is None:
+        raise HTTPException(status_code=400, detail=f"محاسبه کارمزد برای توکن {token} پشتیبانی نمی‌شود")
+
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         tx_result = await session.execute(
             text(f"""
                 SELECT created_at, amount
                 FROM pending_txes
-                WHERE status = '0' AND code = 'PMN'{df}
+                WHERE status = '0' AND code = :token{df}
                 ORDER BY created_at
             """),
             params,
@@ -304,9 +377,10 @@ async def get_total_buys_fee(session: AsyncSession, start_date: Optional[str] = 
             text("""
                 SELECT last_update, price
                 FROM market_parameters_minutes
-                WHERE name = 'ND'
+                WHERE name = :price_series
                 ORDER BY last_update
-            """)
+            """),
+            {"price_series": price_series},
         )
         nd_rows = nd_result.fetchall()
 
@@ -334,6 +408,8 @@ async def get_total_buys_fee(session: AsyncSession, start_date: Optional[str] = 
             "kpi": {"key": "total_buys_fee", "label": "مجموع کارمزد", "value": int(total_buys_fee), "format": "rial"}
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Database error in buys_service.get_total_buys_fee: {e}")
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")

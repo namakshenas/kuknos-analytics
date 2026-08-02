@@ -3,13 +3,16 @@ import client from '../api/client';
 import KPICard from '../components/KPICard';
 import ChartCard from '../components/ChartCard';
 import DateFilter, { getDefaultDateRange } from '../components/DateFilter';
+import TokenFilter from '../components/TokenFilter';
 import { chartColors } from '../utils/chartDefaults';
 import { toJalali, toJalaliShort, toJalaliMonth } from '../utils/formatters';
+import { DEFAULT_TOKEN } from '../utils/tokens';
 
 export default function Buys() {
   const defaults = getDefaultDateRange();
   const [startDate, setStartDate] = useState(defaults.gregorianStart);
   const [endDate, setEndDate] = useState(defaults.gregorianEnd);
+  const [token, setToken] = useState(DEFAULT_TOKEN);
 
   const [kpis, setKpis] = useState([]);
   const [dailyCount, setDailyCount] = useState([]);
@@ -27,7 +30,7 @@ export default function Buys() {
     try {
       setLoading(true);
       setError(null);
-      const params = { start_date: startDate, end_date: endDate };
+      const params = { start_date: startDate, end_date: endDate, token };
 
       const [
         kpisRes, dailyCountRes, dailyVolumeRes, monthlyRes,
@@ -45,16 +48,18 @@ export default function Buys() {
 
       setKpis(kpisRes.data.kpis);
 
-      // Lazy-load expensive fee KPI separately
-      client.get('/buys/total-fee', { params }).then((feeRes) => {
-        setKpis((prev) =>
-          prev.map((kpi) =>
-            kpi.key === 'total_buys_fee' ? { ...kpi, ...feeRes.data.kpi, lazy: false } : kpi
-          )
-        );
-      }).catch((err) => {
-        console.error('Error fetching buys fee:', err);
-      });
+      // Lazy-load expensive fee KPI separately (only offered for tokens with a fee price series)
+      if (kpisRes.data.kpis.some((kpi) => kpi.key === 'total_buys_fee')) {
+        client.get('/buys/total-fee', { params }).then((feeRes) => {
+          setKpis((prev) =>
+            prev.map((kpi) =>
+              kpi.key === 'total_buys_fee' ? { ...kpi, ...feeRes.data.kpi, lazy: false } : kpi
+            )
+          );
+        }).catch((err) => {
+          console.error('Error fetching buys fee:', err);
+        });
+      }
 
       setDailyCount(dailyCountRes.data.series);
       setDailyVolume(dailyVolumeRes.data.series);
@@ -73,7 +78,7 @@ export default function Buys() {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, token]);
 
   useEffect(() => {
     fetchData();
@@ -101,7 +106,9 @@ export default function Buys() {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4 text-gray-900">فروش / پرداخت‌ها</h2>
-      <DateFilter onApply={handleDateApply} />
+      <DateFilter onApply={handleDateApply}>
+        <TokenFilter value={token} onChange={setToken} />
+      </DateFilter>
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
@@ -120,12 +127,12 @@ export default function Buys() {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard
-          title="حجم PMN خریداری شده در روز"
+          title={`حجم ${token} خریداری شده در روز`}
           loading={loading}
           option={{
             xAxis: { type: 'category', data: dailyCount.map((d) => toJalali(d.date)) },
             yAxis: { type: 'value' },
-            series: [{ name: 'حجم PMN', type: 'line', data: dailyCount.map((d) => d.value), color: chartColors[0], smooth: true }],
+            series: [{ name: `حجم ${token}`, type: 'line', data: dailyCount.map((d) => d.value), color: chartColors[0], smooth: true }],
           }}
         />
         <ChartCard

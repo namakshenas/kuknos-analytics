@@ -4,54 +4,61 @@ from fastapi import HTTPException
 from app.logger import logger
 from typing import Dict, Optional
 from app.services.date_utils import build_date_filter
+from app.services.token_utils import DEFAULT_TOKEN
 
 
-async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_kpis(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         result = await session.execute(
-            text(f"SELECT COUNT(*) AS total FROM pending_refunds WHERE status = '0' AND code = 'PMN'{df}"), params
+            text(f"SELECT COUNT(*) AS total FROM pending_refunds WHERE status = '0' AND code = :token{df}"), params
         )
         total_completed = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COUNT(*) AS total FROM pending_refunds WHERE status = '1' AND code = 'PMN'{df}"), params
+            text(f"SELECT COUNT(*) AS total FROM pending_refunds WHERE status = '1' AND code = :token{df}"), params
         )
         total_pending = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COALESCE(SUM(amount), 0) AS total FROM pending_refunds WHERE status = '1' AND code = 'PMN'{df}"), params
+            text(f"SELECT COALESCE(SUM(amount), 0) AS total FROM pending_refunds WHERE status = '1' AND code = :token{df}"), params
         )
-        total_num_pmn_pending = result.scalar() or 0
+        total_num_pending = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COALESCE(SUM(total_price), 0) AS total FROM pending_refunds WHERE status = '1' AND code = 'PMN'{df}"), params
+            text(f"SELECT COALESCE(SUM(total_price), 0) AS total FROM pending_refunds WHERE status = '1' AND code = :token{df}"), params
         )
         pending_amount = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COALESCE(SUM(amount), 0) AS total FROM pending_refunds WHERE status = '0' AND code = 'PMN'{df}"), params
+            text(f"SELECT COALESCE(SUM(amount), 0) AS total FROM pending_refunds WHERE status = '0' AND code = :token{df}"), params
         )
         total_sold = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COALESCE(SUM(refund_price), 0) AS total FROM pending_refunds WHERE status = '0' AND code = 'PMN'{df}"), params
+            text(f"SELECT COALESCE(SUM(refund_price), 0) AS total FROM pending_refunds WHERE status = '0' AND code = :token{df}"), params
         )
         total_payout = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COALESCE(SUM(fee_price), 0) AS total FROM pending_refunds WHERE status = '0' AND code = 'PMN'{df}"), params
+            text(f"SELECT COALESCE(SUM(fee_price), 0) AS total FROM pending_refunds WHERE status = '0' AND code = :token{df}"), params
         )
         total_fees = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COALESCE(AVG(amount), 0) AS avg FROM pending_refunds WHERE status = '0' AND code = 'PMN'{df}"), params
+            text(f"SELECT COALESCE(AVG(amount), 0) AS avg FROM pending_refunds WHERE status = '0' AND code = :token{df}"), params
         )
         avg_amount = result.scalar() or 0
 
         result = await session.execute(
-            text(f"SELECT COUNT(DISTINCT public) AS total FROM pending_refunds WHERE status = '0' AND code = 'PMN'{df}"), params
+            text(f"SELECT COUNT(DISTINCT public) AS total FROM pending_refunds WHERE status = '0' AND code = :token{df}"), params
         )
         unique_sellers = result.scalar() or 0
 
@@ -59,9 +66,9 @@ async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_
             "kpis": [
                 {"key": "total_completed", "label": "تعداد بازخریدهای تکمیل شده", "value": int(total_completed), "format": "number"},
                 {"key": "total_pending", "label": "تعداد بازخریدهای در انتظار", "value": int(total_pending), "format": "number"},
-                {"key": "total_num_pmn_pending", "label": "حجم کل PMN در انتظار بازخرید", "value": int(total_num_pmn_pending), "format": "number"},
+                {"key": "total_num_pmn_pending", "label": f"حجم کل {token} در انتظار بازخرید", "value": int(total_num_pending), "format": "number"},
                 {"key": "pending_amount", "label": "مجموع بازخریدهای در انتظار", "value": int(pending_amount), "format": "rial"},
-                {"key": "total_sold", "label": "حجم کل PMN بازخرید شده", "value": float(total_sold), "format": "number"},
+                {"key": "total_sold", "label": f"حجم کل {token} بازخرید شده", "value": float(total_sold), "format": "number"},
                 {"key": "total_payout", "label": "مجموع بازخرید (ریال)", "value": int(total_payout), "format": "rial"},
                 {"key": "total_fees", "label": "مجموع کارمزد", "value": int(total_fees), "format": "rial"},
                 {"key": "avg_amount", "label": "میانگین مقدار بازخرید", "value": float(avg_amount), "format": "decimal"},
@@ -74,16 +81,22 @@ async def get_kpis(session: AsyncSession, start_date: Optional[str] = None, end_
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_daily_count(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_daily_count(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
         time_filter = df if df else " AND created_at >= NOW() - INTERVAL '12 months'"
 
         result = await session.execute(
             text(f"""
                 SELECT DATE(created_at) AS day, COUNT(*) AS count
                 FROM pending_refunds
-                WHERE status = '0' AND code = 'PMN'{time_filter}
+                WHERE status = '0' AND code = :token{time_filter}
                 GROUP BY DATE(created_at)
                 ORDER BY day
             """),
@@ -100,9 +113,15 @@ async def get_daily_count(session: AsyncSession, start_date: Optional[str] = Non
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_monthly_trend(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_monthly_trend(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         result = await session.execute(
             text(f"""
@@ -112,7 +131,7 @@ async def get_monthly_trend(session: AsyncSession, start_date: Optional[str] = N
                     COALESCE(SUM(amount), 0) AS total_amount,
                     COALESCE(SUM(refund_price), 0) AS total_rials
                 FROM pending_refunds
-                WHERE status = '0' AND code = 'PMN'{df}
+                WHERE status = '0' AND code = :token{df}
                 GROUP BY DATE_TRUNC('month', created_at)
                 ORDER BY month
             """),
@@ -138,16 +157,22 @@ async def get_monthly_trend(session: AsyncSession, start_date: Optional[str] = N
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_rate_trend(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_rate_trend(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
         time_filter = df if df else " AND created_at >= NOW() - INTERVAL '12 months'"
 
         result = await session.execute(
             text(f"""
                 SELECT DATE(created_at) AS day, AVG(refund_rate) AS avg_rate
                 FROM pending_refunds
-                WHERE status = '0' AND code = 'PMN' AND refund_rate > 0{time_filter}
+                WHERE status = '0' AND code = :token AND refund_rate > 0{time_filter}
                 GROUP BY DATE(created_at)
                 ORDER BY day
             """),
@@ -164,9 +189,15 @@ async def get_rate_trend(session: AsyncSession, start_date: Optional[str] = None
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_rate_candlestick(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_rate_candlestick(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
         time_filter = df if df else " AND created_at >= NOW() - INTERVAL '12 months'"
 
         result = await session.execute(
@@ -178,7 +209,7 @@ async def get_rate_candlestick(session: AsyncSession, start_date: Optional[str] 
                     MIN(refund_rate) AS low,
                     MAX(refund_rate) AS high
                 FROM pending_refunds
-                WHERE status IN ('0', '1') AND code = 'PMN' AND refund_rate > 0{time_filter}
+                WHERE status IN ('0', '1') AND code = :token AND refund_rate > 0{time_filter}
                 GROUP BY DATE(created_at)
                 ORDER BY day
             """),
@@ -204,9 +235,15 @@ async def get_rate_candlestick(session: AsyncSession, start_date: Optional[str] 
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_status_distribution(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_status_distribution(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         result = await session.execute(
             text(f"""
@@ -219,7 +256,7 @@ async def get_status_distribution(session: AsyncSession, start_date: Optional[st
                     END AS status_label,
                     COUNT(*) AS count
                 FROM pending_refunds
-                WHERE code = 'PMN' AND status IN ('0', '1'){df}
+                WHERE code = :token AND status IN ('0', '1'){df}
                 GROUP BY status
                 ORDER BY status
             """),
@@ -236,15 +273,21 @@ async def get_status_distribution(session: AsyncSession, start_date: Optional[st
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_by_bank(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_by_bank(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         result = await session.execute(
             text(f"""
                 SELECT destination_bank_name, COUNT(*) AS count, SUM(refund_price) AS total_rials
                 FROM pending_refunds
-                WHERE status = '0' AND code = 'PMN'
+                WHERE status = '0' AND code = :token
                   AND destination_bank_name IS NOT NULL AND destination_bank_name != ''{df}
                 GROUP BY destination_bank_name
                 ORDER BY count DESC
@@ -265,9 +308,15 @@ async def get_by_bank(session: AsyncSession, start_date: Optional[str] = None, e
         raise HTTPException(status_code=503, detail="خطا در اتصال به پایگاه داده")
 
 
-async def get_amount_distribution(session: AsyncSession, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+async def get_amount_distribution(
+    session: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: str = DEFAULT_TOKEN,
+) -> Dict:
     try:
         df, params = build_date_filter(start_date, end_date)
+        params["token"] = token
 
         result = await session.execute(
             text(f"""
@@ -281,7 +330,7 @@ async def get_amount_distribution(session: AsyncSession, start_date: Optional[st
                     END AS bucket,
                     COUNT(*) AS count
                 FROM pending_refunds
-                WHERE status = '0' AND code = 'PMN'{df}
+                WHERE status = '0' AND code = :token{df}
                 GROUP BY bucket
                 ORDER BY MIN(amount)
             """),

@@ -2,19 +2,39 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Download } from 'lucide-react';
 import client from '../api/client';
-import { formatNumber, toPersianDigits } from '../utils/formatters';
+import { formatNumber, toPersianDigits, toJalali, toJalaliLatin } from '../utils/formatters';
 
 const COLUMNS = [
   { key: 'first_name', label: 'نام' },
   { key: 'last_name', label: 'نام خانوادگی' },
   { key: 'national_id', label: 'کد ملی' },
   { key: 'mobile', label: 'موبایل' },
-  { key: 'amount', label: 'مقدار PMN', numeric: true },
+  { key: 'token', label: 'نوع توکن' },
+  { key: 'amount', label: 'مقدار', numeric: true },
   { key: 'refund_price', label: 'مبلغ بازخرید (ریال)', numeric: true },
+  { key: 'updated_at', label: 'تاریخ درخواست', date: true },
   { key: 'iban', label: 'شبا' },
   { key: 'cardnumber', label: 'شماره کارت' },
   { key: 'public', label: 'کلید عمومی' },
 ];
+
+/** Columns without a free-text search box in the filter row. */
+const isFilterable = (col) => !col.numeric && !col.date;
+
+/** Cell value as shown in the table (Persian digits, Jalali dates). */
+const displayValue = (col, row) => {
+  const value = row[col.key];
+  if (col.date) return value ? toJalali(value) : '—';
+  if (col.numeric) return formatNumber(value);
+  return toPersianDigits(value ?? '—');
+};
+
+/** Cell value written to the Excel sheet (raw numbers, Jalali dates in Latin digits). */
+const exportValue = (col, row) => {
+  const value = row[col.key];
+  if (col.date) return value ? toJalaliLatin(value) : '';
+  return value ?? '';
+};
 
 const PAGE_SIZES = [50, 100, 200];
 
@@ -77,9 +97,7 @@ export default function PendingUsersTable() {
       const rows = res.data.data;
 
       const header = COLUMNS.map((c) => c.label);
-      const body = rows.map((row) =>
-        COLUMNS.map((col) => (row[col.key] ?? ''))
-      );
+      const body = rows.map((row) => COLUMNS.map((col) => exportValue(col, row)));
 
       const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
 
@@ -140,7 +158,7 @@ export default function PendingUsersTable() {
 
       {/* Table */}
       <div className="overflow-x-auto scrollbar-thin">
-        <table className="w-full text-sm" style={{ minWidth: '1100px' }}>
+        <table className="w-full text-sm" style={{ minWidth: '1320px' }}>
           <thead>
             <tr className="bg-gray-50 text-gray-600">
               {COLUMNS.map((col) => (
@@ -152,7 +170,7 @@ export default function PendingUsersTable() {
             <tr className="bg-gray-50/50 border-b border-gray-200">
               {COLUMNS.map((col) => (
                 <th key={`f-${col.key}`} className="px-4 pb-2.5">
-                  {!col.numeric ? (
+                  {isFilterable(col) ? (
                     <input
                       type="text"
                       placeholder="جستجو..."
@@ -189,9 +207,7 @@ export default function PendingUsersTable() {
                 <tr key={idx} className="hover:bg-gray-50/60 transition-colors">
                   {COLUMNS.map((col) => (
                     <td key={col.key} className="px-4 py-3 whitespace-nowrap text-gray-700">
-                      {col.numeric
-                        ? formatNumber(row[col.key])
-                        : toPersianDigits(row[col.key] ?? '—')}
+                      {displayValue(col, row)}
                     </td>
                   ))}
                 </tr>

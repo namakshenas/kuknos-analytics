@@ -3,13 +3,16 @@ import client from '../api/client';
 import KPICard from '../components/KPICard';
 import ChartCard from '../components/ChartCard';
 import DateFilter, { getDefaultDateRange } from '../components/DateFilter';
+import TokenFilter from '../components/TokenFilter';
 import { chartColors } from '../utils/chartDefaults';
 import { toJalali, toJalaliShort, toJalaliMonth, formatNumber } from '../utils/formatters';
+import { DEFAULT_TOKEN } from '../utils/tokens';
 
 export default function Refunds() {
   const defaults = getDefaultDateRange();
   const [startDate, setStartDate] = useState(defaults.gregorianStart);
   const [endDate, setEndDate] = useState(defaults.gregorianEnd);
+  const [token, setToken] = useState(DEFAULT_TOKEN);
 
   const [kpis, setKpis] = useState([]);
   const [dailyCount, setDailyCount] = useState([]);
@@ -27,7 +30,7 @@ export default function Refunds() {
     try {
       setLoading(true);
       setError(null);
-      const params = { start_date: startDate, end_date: endDate };
+      const params = { start_date: startDate, end_date: endDate, token };
 
       const [kpisRes, dailyRes, monthlyRes, rateRes, rateCandleRes, statusRes, bankRes, amountRes] =
         await Promise.all([
@@ -59,7 +62,7 @@ export default function Refunds() {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, token]);
 
   useEffect(() => {
     fetchData();
@@ -87,7 +90,9 @@ export default function Refunds() {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4 text-gray-900">بازخریدها</h2>
-      <DateFilter onApply={handleDateApply} />
+      <DateFilter onApply={handleDateApply}>
+        <TokenFilter value={token} onChange={setToken} />
+      </DateFilter>
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">

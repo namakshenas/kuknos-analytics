@@ -53,6 +53,17 @@ export function toJalali(gregorianDate) {
 }
 
 /**
+ * Convert Gregorian date to Jalali with Latin digits — for spreadsheet exports,
+ * where the cell should stay readable and sortable.
+ */
+export function toJalaliLatin(gregorianDate) {
+  if (!gregorianDate) return '';
+  const date = new Date(gregorianDate);
+  const j = jalaali.toJalaali(date.getFullYear(), date.getMonth() + 1, date.getDate());
+  return `${j.jy}/${String(j.jm).padStart(2, '0')}/${String(j.jd).padStart(2, '0')}`;
+}
+
+/**
  * Persian month names
  */
 export const persianMonths = [
