@@ -40,6 +40,8 @@ results through KPI cards and interactive charts.
 ### Frontend
 - **React 18** with Vite
 - **Tailwind CSS 3** — semantic design tokens as CSS variables
+- **Vazirmatn** — self-hosted via `@fontsource-variable/vazirmatn`, no CDN, so
+  the UI renders correctly on a network with no outbound internet access
 - **Apache ECharts** (`echarts-for-react`) for charts
 - **React Router** for navigation
 - **Axios** for API calls
