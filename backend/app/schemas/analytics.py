@@ -63,6 +63,8 @@ class TopUserItem(BaseModel):
     wallet: str
     total_amount: float
     tx_count: int
+    # Account holder's name; None when the wallet has no identity record.
+    name: Optional[str] = None
 
 
 class TopUsersResponse(BaseModel):

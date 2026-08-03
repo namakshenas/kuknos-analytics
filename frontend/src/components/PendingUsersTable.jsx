@@ -127,9 +127,13 @@ export default function PendingUsersTable() {
   return (
     <Card padding="none" className="mt-5 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-semibold text-content">کاربران با بازخرید معلق</h3>
           <Badge>{toPersianDigits(total)} نتیجه</Badge>
+          {/* This table is deliberately NOT driven by the page's token filter —
+              each row reports its own token in the «نوع توکن» column and has a
+              per-column search. Labelled so the difference doesn't read as a bug. */}
+          <Badge tone="primary">همه توکن‌ها</Badge>
         </div>
         <Button
           variant="success"

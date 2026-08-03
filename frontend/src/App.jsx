@@ -4,6 +4,7 @@ import Buys from './pages/Buys';
 import Refunds from './pages/Refunds';
 import UserAnalytics from './pages/UserAnalytics';
 import ComingSoon from './pages/ComingSoon';
+import Home from './pages/Home';
 import { navItems } from './config/navigation';
 
 const PAGES = {
@@ -17,7 +18,10 @@ export default function App() {
     <BrowserRouter>
       <Layout>
         <Routes>
-          <Route path="/" element={<Navigate to="/refunds" replace />} />
+          {/* The intro page is the app's home, reached from the header logo.
+              It states the two caveats — Kuknos Wallet only, still in
+              development — before anyone reads a figure. */}
+          <Route path="/" element={<Home />} />
 
           {/* Routes are generated from the same config the sidebar reads, so a
               section's title always matches the item that was clicked. */}
@@ -32,7 +36,7 @@ export default function App() {
             );
           })}
 
-          <Route path="*" element={<Navigate to="/refunds" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
     </BrowserRouter>

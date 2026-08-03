@@ -64,6 +64,15 @@ export function toJalaliLatin(gregorianDate) {
 }
 
 /**
+ * Abbreviate a wallet address for display: `GACZ…7T9K`.
+ * Left in Latin script — these are addresses, not numbers.
+ */
+export function shortWallet(wallet) {
+  if (!wallet) return '—';
+  return wallet.length <= 12 ? wallet : `${wallet.slice(0, 4)}…${wallet.slice(-4)}`;
+}
+
+/**
  * Persian month names
  */
 export const persianMonths = [

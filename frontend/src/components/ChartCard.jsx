@@ -97,9 +97,17 @@ export default function ChartCard({
   return (
     <Card>
       {header}
+      {/*
+        `direction: ltr` is required, not cosmetic. ECharts positions every
+        piece of text assuming a left-to-right box layout; under the page's
+        inherited `direction: rtl` the legend labels flowed backwards across
+        their own colour markers and the axis labels landed on the axis line.
+        Label text keeps its Persian ordering via the FSI wrapping in
+        `chartTheme.bidi` — see the note there.
+      */}
       <ReactECharts
         option={merged}
-        style={{ height }}
+        style={{ height, direction: 'ltr' }}
         opts={{ renderer: 'svg' }}
         notMerge
       />

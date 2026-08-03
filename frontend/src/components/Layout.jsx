@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
 import DbStatus from './DbStatus';
@@ -52,14 +53,21 @@ export default function Layout({ children }) {
           <Menu size={20} aria-hidden="true" />
         </button>
 
-        <img
-          src="/kuknos_co_logo.jpeg"
-          alt=""
-          width="28"
-          height="28"
-          className="h-7 w-7 shrink-0 rounded-md object-contain"
-        />
-        <h1 className="truncate text-lg font-bold text-content">ققنوس آنالیتیکس</h1>
+        {/* Home link. The logo is decorative (alt="") because the adjacent
+            title already names the link. */}
+        <Link
+          to="/"
+          className="flex min-w-0 items-center gap-3 rounded-lg transition-opacity duration-fast hover:opacity-80"
+        >
+          <img
+            src="/kuknos_co_logo.jpeg"
+            alt=""
+            width="28"
+            height="28"
+            className="h-7 w-7 shrink-0 rounded-md object-contain"
+          />
+          <h1 className="truncate text-lg font-bold text-content">ققنوس آنالیتیکس</h1>
+        </Link>
 
         <div className="ms-auto">
           <DbStatus />

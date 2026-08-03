@@ -3,6 +3,26 @@ import { formatNumber, toPersianDigits } from './formatters';
 const FONT = '"Vazirmatn Variable", sans-serif';
 
 /**
+ * Wrap a label in a Unicode "first strong isolate" so it renders with the
+ * direction implied by its own content.
+ *
+ * Why this exists: ECharts computes every text position assuming a
+ * left-to-right box layout, so `ChartCard` renders the chart container with
+ * `direction: ltr`. Without that, the inherited page-level `direction: rtl`
+ * pushed legend labels backwards over their colour markers («خر▪د») and slid
+ * axis labels onto the axis line.
+ *
+ * But a bare LTR container reverses composite labels: «۱۰۰ هزار» would read
+ * "هزار ۱۰۰". FSI…PDI restores per-label ordering, and because it takes the
+ * direction from the first strong character it does the right thing for every
+ * shape we render — «۱۰۰ هزار» and «۱٫۲ میلیون» stay RTL, while `#۱`, `PMN`
+ * and «۲-۵» are left exactly as they were.
+ */
+const FSI = '⁨';
+const PDI = '⁩';
+export const bidi = (text) => `${FSI}${text}${PDI}`;
+
+/**
  * Read a design token at runtime so charts and DOM never drift apart —
  * and so a future dark theme needs no changes here.
  */
@@ -44,18 +64,28 @@ const LINE_TYPES = ['solid', 'dashed', 'dotted'];
  * mixing scripts mid-token. These read correctly in an RTL Persian UI.
  */
 function abbreviatePersian(value) {
-  if (typeof value !== 'number') return toPersianDigits(value);
+  if (typeof value !== 'number') return bidi(toPersianDigits(value));
   const scale = (n, word) => {
     // Drop a redundant ".0" so ticks read "۸۵ هزار", not "۸۵٫۰ هزار"
     const num = Number((value / n).toFixed(1));
     return `${toPersianDigits(String(num).replace('.', '٫'))} ${word}`;
   };
   const abs = Math.abs(value);
-  if (abs >= 1e9) return scale(1e9, 'میلیارد');
-  if (abs >= 1e6) return scale(1e6, 'میلیون');
-  if (abs >= 1e3) return scale(1e3, 'هزار');
-  return toPersianDigits(value);
+  if (abs >= 1e9) return bidi(scale(1e9, 'میلیارد'));
+  if (abs >= 1e6) return bidi(scale(1e6, 'میلیون'));
+  if (abs >= 1e3) return bidi(scale(1e3, 'هزار'));
+  return bidi(toPersianDigits(value));
 }
+
+/** Shared legend styling. `formatter` keeps each label's own direction. */
+const legendBase = {
+  itemWidth: 12,
+  itemHeight: 12,
+  itemGap: 18,
+  icon: 'roundRect',
+  formatter: bidi,
+  textStyle: { fontFamily: FONT, fontSize: 11, padding: [0, 2, 0, 2] },
+};
 
 /** Base option shared by every chart. */
 export function baseOption() {
@@ -79,7 +109,10 @@ export function baseOption() {
       borderColor: border,
       borderWidth: 1,
       padding: [8, 12],
-      extraCssText: 'box-shadow: 0 8px 24px rgb(15 23 42 / 0.10); border-radius: 8px;',
+      // The container is LTR for ECharts' benefit; the tooltip is plain HTML,
+      // so it opts back into RTL for its Persian body text.
+      extraCssText:
+        'box-shadow: 0 8px 24px rgb(15 23 42 / 0.10); border-radius: 8px; direction: rtl; text-align: right;',
       textStyle: { fontFamily: FONT, fontSize: 12, color: text },
       axisPointer: { type: 'line', lineStyle: { color: border } },
       formatter: (params) => {
@@ -107,6 +140,7 @@ export function baseOption() {
         // including pies. hideOverlap keeps labels horizontal and simply
         // drops the ones that would collide (skill rule `axis-readability`).
         hideOverlap: true,
+        formatter: bidi,
       },
     },
     yAxis: {
@@ -176,14 +210,7 @@ export const preset = {
    */
   multiLine: ({ series, categories }) => ({
     xAxis: { data: categories },
-    legend: {
-      top: 0,
-      left: 'center',
-      itemWidth: 16,
-      itemHeight: 8,
-      itemGap: 18,
-      textStyle: { fontFamily: FONT, fontSize: 11 },
-    },
+    legend: { ...legendBase, top: 0, left: 'center' },
     grid: { top: 36, left: 8, right: 8, bottom: 8, containLabel: true },
     series: series.map((s, i) => ({
       name: s.name,
@@ -201,19 +228,54 @@ export const preset = {
    * Horizontal bars — for ranked lists, where long labels need the room.
    * Swaps which axis carries the value formatter; the shared base assumes
    * category-x / value-y.
+   *
+   * `rowLabels` / `rowSubLabels` / `rowMeta` are per-bar tooltip content,
+   * indexed the same as `data`. The axis keeps the short rank (`#۱`) so the
+   * plot stays wide, while the tooltip carries the identity.
    */
-  barHorizontal: ({ name, data, categories, color = chartColors[0] }) => ({
+  barHorizontal: ({
+    name,
+    data,
+    categories,
+    color = chartColors[0],
+    rowLabels,
+    rowSubLabels,
+    rowMeta,
+    metaLabel,
+  }) => ({
+    tooltip: rowLabels
+      ? {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          formatter: (params) => {
+            const p = Array.isArray(params) ? params[0] : params;
+            const subtle = tokenColor('text-subtle', 'rgb(100 116 139)');
+            const head = rowLabels[p.dataIndex] ?? p.axisValue;
+            const sub = rowSubLabels?.[p.dataIndex];
+            const meta = rowMeta?.[p.dataIndex];
+            return [
+              `<div style="font-weight:600;margin-bottom:2px">${head}</div>`,
+              sub ? `<div style="color:${subtle};font-size:11px;direction:ltr;text-align:right;margin-bottom:4px">${sub}</div>` : '',
+              `${p.marker} ${name}: <b>${formatNumber(p.value)}</b>`,
+              meta != null ? `<br/><span style="color:${subtle}">${metaLabel ?? 'تعداد'}: ${formatNumber(meta)}</span>` : '',
+            ].join('');
+          },
+        }
+      : undefined,
     xAxis: {
       type: 'value',
       axisLine: { show: false },
       splitLine: { lineStyle: { type: 'dashed' } },
+      // Spelled-out Persian scale words are wide; the default tick count put
+      // eight of them across a ~450px axis.
+      splitNumber: 4,
       axisLabel: { formatter: abbreviatePersian, hideOverlap: true },
     },
     yAxis: {
       type: 'category',
       data: categories,
       splitLine: { show: false },
-      axisLabel: { formatter: (v) => v },
+      axisLabel: { formatter: bidi, hideOverlap: true },
     },
     grid: { top: 8, left: 8, right: 16, bottom: 8, containLabel: true },
     series: [
@@ -252,16 +314,7 @@ export const preset = {
     tooltip: { trigger: 'item' },
     // Legend along the bottom, not the side: Persian category labels need the
     // full width, and a vertical legend squeezed them against the donut.
-    legend: {
-      type: 'scroll',
-      orient: 'horizontal',
-      bottom: 0,
-      left: 'center',
-      itemWidth: 10,
-      itemHeight: 10,
-      itemGap: 16,
-      textStyle: { fontFamily: FONT, fontSize: 11 },
-    },
+    legend: { ...legendBase, type: 'scroll', orient: 'horizontal', bottom: 0, left: 'center' },
     series: [
       {
         name,

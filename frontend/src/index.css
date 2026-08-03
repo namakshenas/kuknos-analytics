@@ -17,7 +17,10 @@
  */
 :root {
   /* Surfaces */
-  --color-bg: 248 250 252;            /* page background   – slate-50  */
+  /* A step darker than the cards so white surfaces read as raised. Going
+     further starts failing AA for --color-text-subtle on the page background
+     (see the note on PageHeader in §10.4). */
+  --color-bg: 241 245 249;            /* page background   – slate-100 */
   --color-surface: 255 255 255;       /* cards, header, sidebar        */
   --color-surface-muted: 248 250 252; /* table headers, filter rows    */
   --color-surface-hover: 241 245 249; /* row / item hover  – slate-100 */
