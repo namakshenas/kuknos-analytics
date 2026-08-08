@@ -82,16 +82,21 @@ export default function Sidebar({ collapsed, toggleCollapsed, mobileOpen, closeM
                   'transition-colors duration-fast',
                   collapsed && 'lg:justify-center lg:px-0',
                   isActive
-                    ? 'bg-primary-soft font-semibold text-primary'
+                    // Square on the inline-start side — the right, in this RTL
+                    // layout — so the indicator bar below sits flush against a
+                    // straight edge instead of curving away from it. The end
+                    // (left) corners keep the pill's radius. `rounded-s-*` is
+                    // generated after `rounded-lg`, so it wins on order.
+                    ? 'rounded-s-none bg-primary-soft font-semibold text-primary'
                     : 'text-content-muted hover:bg-surface-hover hover:text-content'
                 )}
               >
-                {/* Position, not just colour, marks the current page */}
+                {/* Position, not just colour, marks the current page. Full
+                    height and square-ended, so it reads as one continuous edge
+                    with the row's squared-off start corners — a shorter pill
+                    bar left a gap at each corner. */}
                 {isActive && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-primary"
-                  />
+                  <span aria-hidden="true" className="absolute inset-y-0 start-0 w-0.5 bg-primary" />
                 )}
                 <Icon size={18} className="shrink-0" aria-hidden="true" />
                 <span className={cn('truncate', collapsed && 'lg:hidden')}>{label}</span>
