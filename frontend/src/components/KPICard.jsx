@@ -1,4 +1,11 @@
-import { formatNumber, formatRial, formatPercent, formatDecimal } from '../utils/formatters';
+import {
+  formatNumber,
+  formatRial,
+  formatPercent,
+  formatDecimal,
+  formatCompactNumber,
+  formatCompactRial,
+} from '../utils/formatters';
 import { Card, Skeleton } from './ui';
 
 const FORMATTERS = {
@@ -9,11 +16,24 @@ const FORMATTERS = {
 };
 
 /**
+ * Counts and money get condensed — those are the two formats that run to ten
+ * digits and more. Percentages and 2-decimal averages are already short, so
+ * they keep their exact rendering.
+ */
+const COMPACT_FORMATTERS = {
+  rial: formatCompactRial,
+  number: formatCompactNumber,
+};
+
+/**
  * A single metric. `lazy` covers the progressively-loaded fee KPI, which
  * arrives after the main batch.
  */
 export default function KPICard({ label, value, format, icon: Icon, lazy }) {
   const formatValue = FORMATTERS[format] ?? formatNumber;
+  const formatCompact = COMPACT_FORMATTERS[format] ?? formatValue;
+  // The card shows the condensed figure; the exact one stays one hover away.
+  const exact = formatValue(value);
 
   return (
     <Card padding="sm" className="transition-shadow duration-base hover:shadow-md">
@@ -23,8 +43,8 @@ export default function KPICard({ label, value, format, icon: Icon, lazy }) {
           {lazy ? (
             <Skeleton className="h-7 w-2/3" />
           ) : (
-            <p className="truncate text-2xl font-bold text-content" title={formatValue(value)}>
-              {formatValue(value)}
+            <p className="truncate text-2xl font-bold text-content" title={exact}>
+              {formatCompact(value)}
             </p>
           )}
         </div>

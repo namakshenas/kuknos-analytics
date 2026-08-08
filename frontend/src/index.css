@@ -84,9 +84,19 @@
     font-family: 'Vazirmatn Variable', sans-serif;
     background-color: rgb(var(--color-bg));
     color: rgb(var(--color-text));
-    /* Persian digits stay column-aligned in tables and KPI cards */
-    font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
+  }
+
+  /*
+   * Tabular figures are for columns, and nothing else. Vazirmatn pads every
+   * Persian digit to one advance width, but ۰ (a dot) and ۱ (a stroke) are far
+   * narrower than the rest, so the padding reads as broken letter-spacing —
+   * «۱۲۸٬۴۵۶» came out 25% wider than its natural width with gaps around the
+   * ۰ and ۱. This used to sit on `body`, which spent that cost on every KPI
+   * value and every line of prose to align columns that only exist in tables.
+   */
+  table {
+    font-variant-numeric: tabular-nums;
   }
 
   /* One visible focus ring for every interactive element (skill rule

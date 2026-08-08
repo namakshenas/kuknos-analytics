@@ -27,6 +27,46 @@ export function formatRial(amount) {
 }
 
 /**
+ * Persian short scale, largest first. Capped at میلیارد on purpose: Persian
+ * finance writes «۱٬۲۳۵ میلیارد ریال», not «۱٫۲ هزار میلیارد ریال».
+ */
+const COMPACT_SCALES = [
+  { unit: 1e9, word: 'میلیارد' },
+  { unit: 1e6, word: 'میلیون' },
+];
+
+/**
+ * Condensed number for KPI cards, where a full figure has nowhere to go —
+ * a 13-digit rial value overflowed its card and lost its « ریال» suffix to
+ * the ellipsis. Below a million the exact number is already short, so it is
+ * left alone; above it, the value collapses onto a Persian scale word.
+ *
+ * Lossy by design — callers must keep the exact value reachable (KPICard puts
+ * it in the `title` tooltip).
+ */
+export function formatCompactNumber(num) {
+  if (num === null || num === undefined) return toPersianDigits('0');
+  const value = Number(num);
+  const scale = COMPACT_SCALES.find((s) => Math.abs(value) >= s.unit);
+  if (!scale) return formatNumber(value);
+
+  const mantissa = value / scale.unit;
+  // One decimal keeps «۴۵٫۷ میلیارد» informative; past 100 it is noise. The
+  // Number() round-trip drops a redundant ".0" — «۴۵ میلیارد», not «۴۵٫۰».
+  const text =
+    Math.abs(mantissa) < 100
+      ? toPersianDigits(String(Number(mantissa.toFixed(1))).replace('.', '٫'))
+      : formatNumber(mantissa);
+  return `${text} ${scale.word}`;
+}
+
+/** Condensed Rial value — `formatCompactNumber` plus the unit. */
+export function formatCompactRial(amount) {
+  if (amount === null || amount === undefined) return toPersianDigits('۰ ریال');
+  return `${formatCompactNumber(amount)} ریال`;
+}
+
+/**
  * Format percentage with Persian digits
  */
 export function formatPercent(value) {
